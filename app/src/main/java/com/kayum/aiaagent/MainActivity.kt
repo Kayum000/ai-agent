@@ -1,10 +1,8 @@
 package com.kayum.aiaagent
 
-import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
@@ -20,7 +18,6 @@ class MainActivity : Activity() {
  private lateinit var status: TextView
  private var tts: TextToSpeech? = null
  private var speakNext = false
- private val voiceReq=42
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
  private val models = listOf("gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite")
  private val pcToken = "mmc-local-test-token"
@@ -29,8 +26,7 @@ class MainActivity : Activity() {
   super.onCreate(b); setContentView(R.layout.activity_main)
   chat=findViewById(R.id.chat); input=findViewById(R.id.input); status=findViewById(R.id.status)
   findViewById<Button>(R.id.send).setOnClickListener { send(false) }
-  findViewById<Button>(R.id.voice).setOnClickListener { voice() }
-  findViewById<Button>(R.id.settings).setOnClickListener { settings() }
+  findViewById<Button>(R.id.voice).setOnClickListener {\n   Toast.makeText(this, "Voice input is disabled in the Play Protect safe build.", Toast.LENGTH_SHORT).show()\n  }\n  findViewById<Button>(R.id.settings).setOnClickListener { settings() }
   findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
   tts=TextToSpeech(this) { result ->
    if(result==TextToSpeech.SUCCESS) {
@@ -179,24 +175,6 @@ class MainActivity : Activity() {
    .setView(box).setPositiveButton("Save") { _,_ ->
     prefs.edit().putString("gemini_key",key.text.toString().trim()).putString("pc_url",pc.text.toString().trim()).apply(); refreshStatus()
    }.setNegativeButton("Cancel",null).show()
- }
-
- private fun voice() {
-  if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
-   requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),voiceReq); return
-  }
-  startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-   putExtra(RecognizerIntent.EXTRA_LANGUAGE,"bn-BD")
-   putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-  },voiceReq)
- }
-
- override fun onActivityResult(r:Int,c:Int,d:Intent?){
-  super.onActivityResult(r,c,d)
-  if(r==voiceReq && c==RESULT_OK){
-   input.setText(d?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?:"")
-   send(true)
-  }
  }
 
  override fun onDestroy(){
