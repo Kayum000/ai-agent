@@ -26,12 +26,20 @@ jobs:
           set -e
           if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
             echo "Using configured release signing key."
           else
             keytool -genkeypair -v -keystore "$RUNNER_TEMP/release.keystore" -storepass changeit -alias my-pc-ai-agent -keypass changeit -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=My PC AI Agent, OU=Android, O=Kayum"
+            echo "ANDROID_KEYSTORE_PASSWORD=changeit" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=my-pc-ai-agent" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=changeit" >> "$GITHUB_ENV"
             echo "Using an ephemeral release signing key for this build."
           fi
       - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
         run: |
           ./gradlew assembleRelease
       - name: Verify APK signature
