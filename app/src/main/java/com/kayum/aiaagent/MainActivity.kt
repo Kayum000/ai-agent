@@ -21,6 +21,7 @@ class MainActivity : Activity() {
  private val smsReq=43
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
  private val model = "gemini-2.5-flash-lite"
+ private val pcToken = "mmc-local-test-token"
 
  override fun onCreate(b: Bundle?) {
   super.onCreate(b); setContentView(R.layout.activity_main)
@@ -29,12 +30,17 @@ class MainActivity : Activity() {
   findViewById<Button>(R.id.voice).setOnClickListener { voice() }
   findViewById<Button>(R.id.settings).setOnClickListener { settings() }
   findViewById<Button>(R.id.sms).setOnClickListener { smsDialog() }
+  findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
   refreshStatus()
  }
 
  private fun refreshStatus() {
-  status.text = if (prefs.getString("gemini_key", "").orEmpty().isNotBlank())
-   "Cloud AI: Gemini configured • " + model else "Cloud AI: add Gemini API key in Settings"
+  val pc=prefs.getString("pc_url", "").orEmpty()
+  status.text = if (pc.isNotBlank())
+   "PC Agent: configured • Cloud AI: " + if (prefs.getString("gemini_key", "").orEmpty().isNotBlank()) model else "not configured"
+  else if (prefs.getString("gemini_key", "").orEmpty().isNotBlank())
+   "Cloud AI: Gemini configured • " + model + " • PC Agent: not configured"
+  else "Cloud AI: add Gemini API key • PC Agent: add URL in Settings"
  }
 
  private fun send() {
@@ -76,6 +82,48 @@ class MainActivity : Activity() {
   } catch(e:Exception) { "Cloud AI connection error: " + (e.message ?: "unknown error") }
  }
 
+ private fun testPcAgent() {
+  val base=prefs.getString("pc_url", "").orEmpty().trim().ifBlank { "http://127.0.0.1:8765" }
+  thread {
+   try {
+    val url=URL(base.trimEnd('/') + "/health")
+    val conn=url.openConnection() as HttpURLConnection
+    conn.requestMethod="GET"; conn.connectTimeout=5000; conn.readTimeout=5000
+    val code=conn.responseCode
+    val body=(if(code in 200..299) conn.inputStream else conn.errorStream).bufferedReader().use { it.readText() }
+    runOnUiThread {
+     status.text="PC Agent: CONNECTED • HTTP $code"
+     chat.append("\n\nPC Test: CONNECTED\n" + body)
+    }
+   } catch(e:Exception) {
+    runOnUiThread {
+     status.text="PC Agent: connection failed"
+     chat.append("\n\nPC Test: FAILED\n" + (e.message ?: "unknown error"))
+    }
+   }
+  }
+ }
+
+ private fun sendPcCommand(command:String, callback:(String)->Unit) {
+  val base=prefs.getString("pc_url", "").orEmpty().trim().ifBlank { "http://127.0.0.1:8765" }
+  thread {
+   val result=try {
+    val conn=URL(base.trimEnd('/') + "/api/mobile/command").openConnection() as HttpURLConnection
+    conn.requestMethod="POST"; conn.connectTimeout=10000; conn.readTimeout=30000
+    conn.setRequestProperty("Content-Type","application/json")
+    conn.setRequestProperty("X-PC-Agent-Token", pcToken)
+    conn.doOutput=true
+    val body=org.json.JSONObject().put("command",command).toString()
+    conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+    val code=conn.responseCode
+    val stream=if(code in 200..299) conn.inputStream else conn.errorStream
+    val text=stream.bufferedReader().use { it.readText() }
+    "HTTP $code: $text"
+   } catch(e:Exception) { "PC Agent error: " + (e.message ?: "unknown error") }
+   runOnUiThread { callback(result) }
+  }
+ }
+
  private fun smsDialog() {
   val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(40,10,40,10) }
   val phone=EditText(this).apply { hint="Phone number"; inputType=android.text.InputType.TYPE_CLASS_PHONE }
@@ -100,10 +148,10 @@ class MainActivity : Activity() {
    inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
    setText(prefs.getString("gemini_key",""))
   }
-  val pc=EditText(this).apply { hint="PC Agent URL (optional)"; setText(prefs.getString("pc_url","")) }
+  val pc=EditText(this).apply { hint="PC Agent URL"; setText(prefs.getString("pc_url","").orEmpty().ifBlank { "http://127.0.0.1:8765" }) }
   box.addView(key); box.addView(pc)
   AlertDialog.Builder(this).setTitle("AI Settings")
-   .setMessage("Key শুধু এই ফোনের local storage-এ থাকবে। Chat-এর জন্য Gemini ব্যবহার হবে; PC URL পরে PC Agent connection-এর জন্য ব্যবহার করা যাবে.")
+   .setMessage("PC Agent test USB/ADB reverse-এ http://127.0.0.1:8765 ব্যবহার করুন. Wi-Fi হলে PC-এর LAN IP দিন.")
    .setView(box).setPositiveButton("Save") { _,_ ->
     prefs.edit().putString("gemini_key",key.text.toString().trim()).putString("pc_url",pc.text.toString().trim()).apply()
     refreshStatus()
