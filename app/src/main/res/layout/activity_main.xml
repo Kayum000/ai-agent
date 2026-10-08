@@ -1,10 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:background="#0B1020" android:padding="12dp" android:layout_width="match_parent" android:layout_height="match_parent">
- <TextView android:text="🤖 My PC AI Agent" android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold" android:padding="8dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
- <ScrollView android:id="@+id/scroll" android:layout_weight="1" android:layout_width="match_parent" android:layout_height="0dp"><TextView android:id="@+id/chat" android:textColor="#FFFFFF" android:textSize="16sp" android:padding="10dp" android:text="AI Agent ready. বাংলা বা English লিখুন।\n\nPC বন্ধ থাকলেও এই mobile app খুলবে; PC Agent features চালাতে পরে PC connect করুন।" android:layout_width="match_parent" android:layout_height="wrap_content"/></ScrollView>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+ android:orientation="vertical" android:background="#0B1020" android:padding="12dp"
+ android:layout_width="match_parent" android:layout_height="match_parent">
+ <TextView android:text="🤖 My PC AI Agent" android:textColor="#FFFFFF" android:textSize="22sp"
+  android:textStyle="bold" android:padding="8dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+ <TextView android:id="@+id/status" android:text="Cloud AI: not configured" android:textColor="#9CA3AF"
+  android:textSize="13sp" android:padding="4dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+ <ScrollView android:id="@+id/scroll" android:layout_weight="1" android:layout_width="match_parent" android:layout_height="0dp">
+  <TextView android:id="@+id/chat" android:textColor="#FFFFFF" android:textSize="16sp" android:padding="10dp"
+   android:text="AI Agent ready. বাংলা বা English লিখুন।\n\nSettings থেকে Gemini API key দিলে PC বন্ধ থাকলেও cloud AI chat চলবে।"
+   android:layout_width="match_parent" android:layout_height="wrap_content"/>
+ </ScrollView>
  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
-  <EditText android:id="@+id/input" android:hint="বাংলা বা English..." android:textColor="#FFFFFF" android:textColorHint="#9CA3AF" android:singleLine="true" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+  <EditText android:id="@+id/input" android:hint="বাংলা বা English..." android:textColor="#FFFFFF"
+   android:textColorHint="#9CA3AF" android:singleLine="true" android:layout_weight="1"
+   android:layout_width="0dp" android:layout_height="wrap_content"/>
   <Button android:id="@+id/send" android:text="➤" android:layout_width="60dp" android:layout_height="wrap_content"/>
  </LinearLayout>
- <Button android:id="@+id/voice" android:text="🎤 Voice" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+ <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+  <Button android:id="@+id/voice" android:text="🎤 Voice" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+  <Button android:id="@+id/settings" android:text="⚙ Settings" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+ </LinearLayout>
 </LinearLayout>
