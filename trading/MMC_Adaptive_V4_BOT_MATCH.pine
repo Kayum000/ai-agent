@@ -1,0 +1,280 @@
+//@version=6
+indicator("MMC Adaptive V4 - BOT MATCH + STRATEGY STATS", shorttitle="MMC BOT 1M STATS", overlay=true, max_labels_count=500, max_bars_back=5000)
+
+groupDisplay = "DISPLAY"
+showEMA = input.bool(true, "Show EMA", group=groupDisplay)
+showBB = input.bool(false, "Show Bollinger Bands", group=groupDisplay)
+showSignals = input.bool(true, "Show Signals", group=groupDisplay)
+showEntryText = input.bool(false, "Show Entry Text", group=groupDisplay)
+showTable = input.bool(true, "Show Status Table", group=groupDisplay)
+showStats = input.bool(true, "Show Strategy Stats", group=groupDisplay)
+
+groupSignal = "SIGNAL"
+confirmedOnly = input.bool(true, "Confirmed Candle Only", group=groupSignal)
+allowLong = input.bool(true, "Allow BUY", group=groupSignal)
+allowShort = input.bool(true, "Allow SELL", group=groupSignal)
+
+is1m = timeframe.isminutes and timeframe.multiplier == 1
+
+src = close
+ema20 = ta.ema(src, 20)
+ema50 = ta.ema(src, 50)
+
+prevClose = nz(close[1], close)
+tr1 = high - low
+tr2 = math.abs(high - prevClose)
+tr3 = math.abs(low - prevClose)
+trueRange = math.max(tr1, math.max(tr2, tr3))
+atr14 = ta.sma(trueRange, 14)
+atrPct = close != 0 ? atr14 / close : 0.0
+
+emaGapPct = close != 0 ? math.abs(ema20 - ema50) / close : 0.0
+emaSlopeRaw = ta.roc(ema20, 5)
+emaSlopePct = math.abs(emaSlopeRaw / 100.0)
+
+bbBasis = ta.sma(close, 20)
+bbDev = ta.stdev(close, 20)
+bbUpper = bbBasis + 2.0 * bbDev
+bbLower = bbBasis - 2.0 * bbDev
+bbWidth = bbBasis != 0 ? (bbUpper - bbLower) / bbBasis : 0.0
+
+delta = close - close[1]
+gain = math.max(delta, 0.0)
+loss = math.max(-delta, 0.0)
+avgGain = ta.sma(gain, 14)
+avgLoss = ta.sma(loss, 14)
+
+float rsi14 = na
+if avgLoss == 0
+    if avgGain > 0
+        rsi14 := 100.0
+    else
+        rsi14 := 50.0
+else
+    rs = avgGain / avgLoss
+    rsi14 := 100.0 - (100.0 / (1.0 + rs))
+
+previous20High = ta.highest(high, 20)[1]
+previous20Low = ta.lowest(low, 20)[1]
+
+string regime = "UNCLEAR"
+if atrPct >= 0.0025
+    regime := "HIGH_VOLATILITY"
+else if emaGapPct >= 0.00055 and emaSlopePct >= 0.00020
+    regime := "TREND"
+else if bbWidth <= 0.0018 and atrPct <= 0.0012
+    regime := "RANGE"
+else if bbWidth >= 0.0030 or emaSlopePct >= 0.00035
+    regime := "BREAKOUT"
+
+string botAction = "HOLD"
+float botConfidence = 0.0
+
+if regime == "TREND"
+    if ema20 > ema50 and close > ema20
+        botAction := "BUY"
+        botConfidence := 0.72
+    else if ema20 < ema50 and close < ema20
+        botAction := "SELL"
+        botConfidence := 0.72
+else if regime == "BREAKOUT"
+    if close > previous20High
+        botAction := "BUY"
+        botConfidence := 0.75
+    else if close < previous20Low
+        botAction := "SELL"
+        botConfidence := 0.75
+else if regime == "RANGE"
+    if close <= bbLower and rsi14 <= 35
+        botAction := "BUY"
+        botConfidence := 0.68
+    else if close >= bbUpper and rsi14 >= 65
+        botAction := "SELL"
+        botConfidence := 0.68
+else if regime == "HIGH_VOLATILITY"
+    if close > previous20High
+        botAction := "BUY"
+        botConfidence := 0.75
+    else if close < previous20Low
+        botAction := "SELL"
+        botConfidence := 0.75
+
+confirmed = not confirmedOnly or barstate.isconfirmed
+enoughHistory = bar_index >= 60
+buySignal = is1m and enoughHistory and confirmed and allowLong and botAction == "BUY"
+sellSignal = is1m and enoughHistory and confirmed and allowShort and botAction == "SELL"
+
+if buySignal and sellSignal
+    sellSignal := false
+
+int strategyId = 0
+if buySignal or sellSignal
+    if regime == "TREND"
+        strategyId := 1
+    else if regime == "BREAKOUT"
+        strategyId := 2
+    else if regime == "RANGE"
+        strategyId := 3
+    else if regime == "HIGH_VOLATILITY"
+        strategyId := 4
+
+plot(showEMA ? ema20 : na, title="EMA 20", linewidth=2)
+plot(showEMA ? ema50 : na, title="EMA 50", linewidth=2)
+plot(showBB ? bbUpper : na, title="BB Upper", linewidth=1)
+plot(showBB ? bbBasis : na, title="BB Basis", linewidth=1)
+plot(showBB ? bbLower : na, title="BB Lower", linewidth=1)
+
+confidenceText = botConfidence > 0 ? str.tostring(botConfidence * 100.0, "#") + "%" : "0%"
+
+if showSignals and buySignal
+    label.new(bar_index, low, "BUY\n" + confidenceText + "\nNEXT 1M", xloc=xloc.bar_index, yloc=yloc.belowbar, style=label.style_label_up, textcolor=color.white, color=color.new(color.green, 0), size=size.small)
+
+if showSignals and sellSignal
+    label.new(bar_index, high, "SELL\n" + confidenceText + "\nNEXT 1M", xloc=xloc.bar_index, yloc=yloc.abovebar, style=label.style_label_down, textcolor=color.white, color=color.new(color.red, 0), size=size.small)
+
+if showEntryText and buySignal
+    label.new(bar_index, low, "ENTRY → NEXT CANDLE", xloc=xloc.bar_index, yloc=yloc.belowbar, style=label.style_none, textcolor=color.green, size=size.tiny)
+
+if showEntryText and sellSignal
+    label.new(bar_index, high, "ENTRY → NEXT CANDLE", xloc=xloc.bar_index, yloc=yloc.abovebar, style=label.style_none, textcolor=color.red, size=size.tiny)
+
+var int pendingDirection = 0
+var int pendingStrategy = 0
+var float pendingClose = na
+
+var int trendWins = 0
+var int trendLosses = 0
+var int breakoutWins = 0
+var int breakoutLosses = 0
+var int rangeWins = 0
+var int rangeLosses = 0
+var int highVolWins = 0
+var int highVolLosses = 0
+
+if barstate.isconfirmed and pendingDirection != 0
+    bool win = false
+    bool lossResult = false
+
+    if pendingDirection == 1
+        if close > pendingClose
+            win := true
+        else if close < pendingClose
+            lossResult := true
+    else if pendingDirection == -1
+        if close < pendingClose
+            win := true
+        else if close > pendingClose
+            lossResult := true
+
+    if pendingStrategy == 1
+        if win
+            trendWins += 1
+        else if lossResult
+            trendLosses += 1
+    else if pendingStrategy == 2
+        if win
+            breakoutWins += 1
+        else if lossResult
+            breakoutLosses += 1
+    else if pendingStrategy == 3
+        if win
+            rangeWins += 1
+        else if lossResult
+            rangeLosses += 1
+    else if pendingStrategy == 4
+        if win
+            highVolWins += 1
+        else if lossResult
+            highVolLosses += 1
+
+    pendingDirection := 0
+    pendingStrategy := 0
+    pendingClose := na
+
+if barstate.isconfirmed
+    if buySignal
+        pendingDirection := 1
+        pendingStrategy := strategyId
+        pendingClose := close
+    else if sellSignal
+        pendingDirection := -1
+        pendingStrategy := strategyId
+        pendingClose := close
+
+trendTotal = trendWins + trendLosses
+breakoutTotal = breakoutWins + breakoutLosses
+rangeTotal = rangeWins + rangeLosses
+highVolTotal = highVolWins + highVolLosses
+totalWins = trendWins + breakoutWins + rangeWins + highVolWins
+totalLosses = trendLosses + breakoutLosses + rangeLosses + highVolLosses
+totalTrades = totalWins + totalLosses
+
+winRate(int wins, int losses) =>
+    total = wins + losses
+    total > 0 ? wins * 100.0 / total : 0.0
+
+trendWR = winRate(trendWins, trendLosses)
+breakoutWR = winRate(breakoutWins, breakoutLosses)
+rangeWR = winRate(rangeWins, rangeLosses)
+highVolWR = winRate(highVolWins, highVolLosses)
+overallWR = winRate(totalWins, totalLosses)
+
+var table statusTable = table.new(position.top_right, 2, 8, border_width=1)
+if showTable and barstate.islast
+    table.cell(statusTable, 0, 0, "MMC BOT", text_color=color.white)
+    table.cell(statusTable, 1, 0, is1m ? "1M" : "WRONG TF", text_color=is1m ? color.green : color.red)
+    table.cell(statusTable, 0, 1, "REGIME", text_color=color.white)
+    table.cell(statusTable, 1, 1, regime, text_color=color.white)
+    table.cell(statusTable, 0, 2, "ACTION", text_color=color.white)
+    table.cell(statusTable, 1, 2, botAction, text_color=botAction == "BUY" ? color.green : botAction == "SELL" ? color.red : color.gray)
+    table.cell(statusTable, 0, 3, "CONFIDENCE", text_color=color.white)
+    table.cell(statusTable, 1, 3, confidenceText, text_color=color.white)
+    table.cell(statusTable, 0, 4, "RSI", text_color=color.white)
+    table.cell(statusTable, 1, 4, str.tostring(rsi14, "#.##"), text_color=color.white)
+    table.cell(statusTable, 0, 5, "ATR %", text_color=color.white)
+    table.cell(statusTable, 1, 5, str.tostring(atrPct * 100.0, "#.####"), text_color=color.white)
+    table.cell(statusTable, 0, 6, "ENTRY", text_color=color.white)
+    table.cell(statusTable, 1, 6, botAction == "BUY" or botAction == "SELL" ? "NEXT 1M" : "WAIT", text_color=color.white)
+    table.cell(statusTable, 0, 7, "OVERALL", text_color=color.white)
+    table.cell(statusTable, 1, 7, str.tostring(totalWins) + "W / " + str.tostring(totalLosses) + "L", text_color=color.white)
+
+var table statsTable = table.new(position.bottom_right, 5, 6, border_width=1)
+if showStats and barstate.islast
+    table.cell(statsTable, 0, 0, "STRATEGY", text_color=color.white)
+    table.cell(statsTable, 1, 0, "WIN", text_color=color.white)
+    table.cell(statsTable, 2, 0, "LOSS", text_color=color.white)
+    table.cell(statsTable, 3, 0, "TOTAL", text_color=color.white)
+    table.cell(statsTable, 4, 0, "WIN %", text_color=color.white)
+
+    table.cell(statsTable, 0, 1, "TREND", text_color=color.white)
+    table.cell(statsTable, 1, 1, str.tostring(trendWins), text_color=color.green)
+    table.cell(statsTable, 2, 1, str.tostring(trendLosses), text_color=color.red)
+    table.cell(statsTable, 3, 1, str.tostring(trendTotal), text_color=color.white)
+    table.cell(statsTable, 4, 1, str.tostring(trendWR, "#.##") + "%", text_color=color.white)
+
+    table.cell(statsTable, 0, 2, "BREAKOUT", text_color=color.white)
+    table.cell(statsTable, 1, 2, str.tostring(breakoutWins), text_color=color.green)
+    table.cell(statsTable, 2, 2, str.tostring(breakoutLosses), text_color=color.red)
+    table.cell(statsTable, 3, 2, str.tostring(breakoutTotal), text_color=color.white)
+    table.cell(statsTable, 4, 2, str.tostring(breakoutWR, "#.##") + "%", text_color=color.white)
+
+    table.cell(statsTable, 0, 3, "RANGE", text_color=color.white)
+    table.cell(statsTable, 1, 3, str.tostring(rangeWins), text_color=color.green)
+    table.cell(statsTable, 2, 3, str.tostring(rangeLosses), text_color=color.red)
+    table.cell(statsTable, 3, 3, str.tostring(rangeTotal), text_color=color.white)
+    table.cell(statsTable, 4, 3, str.tostring(rangeWR, "#.##") + "%", text_color=color.white)
+
+    table.cell(statsTable, 0, 4, "HIGH VOL", text_color=color.white)
+    table.cell(statsTable, 1, 4, str.tostring(highVolWins), text_color=color.green)
+    table.cell(statsTable, 2, 4, str.tostring(highVolLosses), text_color=color.red)
+    table.cell(statsTable, 3, 4, str.tostring(highVolTotal), text_color=color.white)
+    table.cell(statsTable, 4, 4, str.tostring(highVolWR, "#.##") + "%", text_color=color.white)
+
+    table.cell(statsTable, 0, 5, "OVERALL", text_color=color.white)
+    table.cell(statsTable, 1, 5, str.tostring(totalWins), text_color=color.green)
+    table.cell(statsTable, 2, 5, str.tostring(totalLosses), text_color=color.red)
+    table.cell(statsTable, 3, 5, str.tostring(totalTrades), text_color=color.white)
+    table.cell(statsTable, 4, 5, str.tostring(overallWR, "#.##") + "%", text_color=color.white)
+
+alertcondition(buySignal, title="MMC BOT BUY", message="MMC BOT | BUY | NEXT CANDLE | 1 MIN EXPIRY")
+alertcondition(sellSignal, title="MMC BOT SELL", message="MMC BOT | SELL | NEXT CANDLE | 1 MIN EXPIRY")
