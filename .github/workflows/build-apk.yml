@@ -16,10 +16,29 @@ jobs:
           java-version: '17'
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build APK
-        run: gradle assembleDebug --stacktrace
-      - name: Upload APK
+      - name: Prepare release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "Using configured release signing key."
+          else
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/release.keystore" -storepass changeit -alias my-pc-ai-agent -keypass changeit -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=My PC AI Agent, OU=Android, O=Kayum"
+            echo "Using an ephemeral release signing key for this build."
+          fi
+      - name: Build signed release APK
+        run: |
+          ./gradlew assembleRelease
+      - name: Verify APK signature
+        run: |
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: My-PC-AI-Agent-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: My-PC-AI-Agent-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
