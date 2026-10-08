@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.widget.*
@@ -31,6 +32,7 @@ class MainActivity : Activity() {
   findViewById<Button>(R.id.settings).setOnClickListener { settings() }
   findViewById<Button>(R.id.sms).setOnClickListener { smsDialog() }
   findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
+  findViewById<Button>(R.id.phoneControl).setOnClickListener { phoneControlSettings() }
   refreshStatus()
  }
 
@@ -48,13 +50,47 @@ class MainActivity : Activity() {
   chat.append("\n\nYou: " + s + "\nAgent: thinking…")
   input.setText("")
   thread {
-   val answer = askGemini(s)
+   val answer = handleAgentRequest(s)
    runOnUiThread {
     chat.append("\n" + answer)
     val scroll=findViewById<ScrollView>(R.id.scroll)
     scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
    }
   }
+ }
+
+ private fun handleAgentRequest(prompt:String):String {
+  val phone = PhoneAgent.handle(this, prompt)
+  if (phone != null) return phone
+  val pc = prefs.getString("pc_url", "").orEmpty().trim()
+  if (pc.isNotBlank()) {
+   val result = sendPcCommandSync(prompt)
+   if (result.startsWith("HTTP 200:")) {
+    val body = result.removePrefix("HTTP 200: ")
+    return try { org.json.JSONObject(body).optString("response").ifBlank { body } } catch(_:Exception) { body }
+   }
+  }
+  return askGemini(prompt)
+ }
+
+ private fun sendPcCommandSync(command:String):String {
+  return try {
+   val base=prefs.getString("pc_url","").orEmpty().trim()
+   if(base.isBlank()) return "PC Agent URL not configured"
+   val conn=URL(base.trimEnd('/') + "/api/mobile/command").openConnection() as HttpURLConnection
+   conn.requestMethod="POST"; conn.connectTimeout=10000; conn.readTimeout=90000
+   conn.setRequestProperty("Content-Type","application/json")
+   conn.setRequestProperty("X-PC-Agent-Token", pcToken); conn.doOutput=true
+   conn.outputStream.use { it.write(org.json.JSONObject().put("command",command).toString().toByteArray(Charsets.UTF_8)) }
+   val code=conn.responseCode
+   val stream=if(code in 200..299) conn.inputStream else conn.errorStream
+   "HTTP " + code + ": " + (stream?.bufferedReader()?.use { it.readText() } ?: "")
+  } catch(e:Exception) { "PC Agent error: " + (e.message ?: "unknown error") }
+ }
+
+ private fun phoneControlSettings() {
+  try { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+  catch(_:Exception) { startActivity(Intent(Settings.ACTION_SETTINGS)) }
  }
 
  private fun askGemini(prompt:String):String {
