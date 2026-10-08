@@ -8,7 +8,9 @@
   android:textSize="13sp" android:padding="4dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
  <ScrollView android:id="@+id/scroll" android:layout_weight="1" android:layout_width="match_parent" android:layout_height="0dp">
   <TextView android:id="@+id/chat" android:textColor="#FFFFFF" android:textSize="16sp" android:padding="10dp"
-   android:text="AI Agent ready. বাংলা বা English লিখুন।\n\nSettings থেকে Gemini API key দিলে PC বন্ধ থাকলেও cloud AI chat চলবে।"
+   android:text="AI Agent ready. বাংলা বা English লিখুন।
+
+Settings থেকে Gemini API key দিলে cloud AI chat চলবে। PC Agent URL দিলে PC connection test করা যাবে।"
    android:layout_width="match_parent" android:layout_height="wrap_content"/>
  </ScrollView>
  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
@@ -21,5 +23,6 @@
   <Button android:id="@+id/voice" android:text="🎤 Voice" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
   <Button android:id="@+id/settings" android:text="⚙ Settings" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
   <Button android:id="@+id/sms" android:text="✉ SMS" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+  <Button android:id="@+id/pcTest" android:text="🖥 PC Test" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
  </LinearLayout>
 </LinearLayout>
