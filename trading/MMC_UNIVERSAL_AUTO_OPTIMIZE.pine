@@ -1,11 +1,12 @@
 //@version=6
-strategy("MMC Adaptive V4 - UNIVERSAL AUTO OPTIMIZE + ALL SIGNALS", shorttitle="MMC UNIVERSAL AO", overlay=true, pyramiding=0, process_orders_on_close=true, max_labels_count=500, max_bars_back=5000)
+strategy("MMC Adaptive V4 - UNIVERSAL AUTO OPTIMIZE + CLEAR SIGNALS", shorttitle="MMC UNIVERSAL AO", overlay=true, pyramiding=0, process_orders_on_close=true, max_labels_count=500, max_bars_back=5000)
 
-// Universal version: works on the current chart symbol/timeframe.
-// Historical BUY/SELL signals are plotted on the candles.
-// The live signal is also shown while the current candle is forming.
-// Auto-optimizer can stop NEW trades from the weakest mature regime,
-// but it NEVER hides the original BUY/SELL signals from the chart.
+// Universal MMC version.
+// ALL original historical signals remain visible.
+// Confirmed BUY = below candle, confirmed SELL = above candle.
+// Live BUY/SELL appears on the currently forming candle.
+// Strategy name is shown with every signal.
+// Auto optimizer only controls NEW trades; it never hides chart signals.
 
 groupSignal = "SIGNAL"
 confirmedOnly = input.bool(true, "Confirmed Candle For Trading", group=groupSignal)
@@ -26,6 +27,7 @@ showStats = input.bool(true, "Show Stats", group=groupOpt)
 
 is1m = timeframe.isminutes and timeframe.multiplier == 1
 src = close
+
 ema20 = ta.ema(src, 20)
 ema50 = ta.ema(src, 50)
 
@@ -51,6 +53,7 @@ gain = math.max(delta, 0.0)
 loss = math.max(-delta, 0.0)
 avgGain = ta.sma(gain, 14)
 avgLoss = ta.sma(loss, 14)
+
 float rsi14 = na
 if avgLoss == 0
     rsi14 := avgGain > 0 ? 100.0 : 50.0
@@ -61,7 +64,10 @@ else
 previous20High = ta.highest(high, 20)[1]
 previous20Low = ta.lowest(low, 20)[1]
 
+// -------------------- REGIME --------------------
+
 string regime = "UNCLEAR"
+
 if atrPct >= 0.0025
     regime := "HIGH_VOLATILITY"
 else if emaGapPct >= 0.00055 and emaSlopePct >= 0.00020
@@ -71,22 +77,28 @@ else if bbWidth <= 0.0018 and atrPct <= 0.0012
 else if bbWidth >= 0.0030 or emaSlopePct >= 0.00035
     regime := "BREAKOUT"
 
+// -------------------- ACTION --------------------
+
 string botAction = "HOLD"
+
 if regime == "TREND"
     if ema20 > ema50 and close > ema20
         botAction := "BUY"
     else if ema20 < ema50 and close < ema20
         botAction := "SELL"
+
 else if regime == "BREAKOUT"
     if close > previous20High
         botAction := "BUY"
     else if close < previous20Low
         botAction := "SELL"
+
 else if regime == "RANGE"
     if close <= bbLower and rsi14 <= 35
         botAction := "BUY"
     else if close >= bbUpper and rsi14 >= 65
         botAction := "SELL"
+
 else if regime == "HIGH_VOLATILITY"
     if close > previous20High
         botAction := "BUY"
@@ -95,18 +107,20 @@ else if regime == "HIGH_VOLATILITY"
 
 regimeId = regime == "TREND" ? 1 : regime == "BREAKOUT" ? 2 : regime == "RANGE" ? 3 : regime == "HIGH_VOLATILITY" ? 4 : 0
 
-confirmed = not confirmedOnly or barstate.isconfirmed
 enoughHistory = bar_index >= 60
 marketAllowed = not tradeOnly1m or is1m
 
-// ORIGINAL signals: these are never removed from the chart by the optimizer.
+// ORIGINAL signals. Optimizer never removes these from the chart.
 rawBuySignal = marketAllowed and enoughHistory and allowLong and botAction == "BUY"
 rawSellSignal = marketAllowed and enoughHistory and allowShort and botAction == "SELL"
 
 confirmedBuySignal = rawBuySignal and (not confirmedOnly or barstate.isconfirmed)
 confirmedSellSignal = rawSellSignal and (not confirmedOnly or barstate.isconfirmed)
 
-// -------------------- PERFORMANCE SCORING --------------------
+// ============================================================
+// PERFORMANCE SCORING
+// ============================================================
+
 var int pendingDirection = 0
 var int pendingStrategy = 0
 var float pendingClose = na
@@ -120,8 +134,6 @@ var int rangeLosses = 0
 var int highVolWins = 0
 var int highVolLosses = 0
 
-// IMPORTANT: score ORIGINAL signals even after a strategy is auto-disabled.
-// This keeps the optimizer's statistics honest and lets the chart show all signals.
 if barstate.isconfirmed and pendingDirection != 0
     bool win = pendingDirection == 1 ? close > pendingClose : close < pendingClose
     bool lossResult = pendingDirection == 1 ? close < pendingClose : close > pendingClose
@@ -131,16 +143,19 @@ if barstate.isconfirmed and pendingDirection != 0
             trendWins += 1
         else if lossResult
             trendLosses += 1
+
     else if pendingStrategy == 2
         if win
             breakoutWins += 1
         else if lossResult
             breakoutLosses += 1
+
     else if pendingStrategy == 3
         if win
             rangeWins += 1
         else if lossResult
             rangeLosses += 1
+
     else if pendingStrategy == 4
         if win
             highVolWins += 1
@@ -156,6 +171,7 @@ if barstate.isconfirmed
         pendingDirection := 1
         pendingClose := close
         pendingStrategy := regimeId
+
     else if confirmedSellSignal and not confirmedBuySignal
         pendingDirection := -1
         pendingClose := close
@@ -175,6 +191,8 @@ breakoutWR = winRate(breakoutWins, breakoutLosses)
 rangeWR = winRate(rangeWins, rangeLosses)
 highVolWR = winRate(highVolWins, highVolLosses)
 
+// -------------------- AUTO OPTIMIZER --------------------
+
 bool trendMature = trendTotal >= minTrades
 bool breakoutMature = breakoutTotal >= minTrades
 bool rangeMature = rangeTotal >= minTrades
@@ -186,12 +204,15 @@ int weakestId = 0
 if trendMature and trendWR < weakestWR
     weakestWR := trendWR
     weakestId := 1
+
 if breakoutMature and breakoutWR < weakestWR
     weakestWR := breakoutWR
     weakestId := 2
+
 if rangeMature and rangeWR < weakestWR
     weakestWR := rangeWR
     weakestId := 3
+
 if highVolMature and highVolWR < weakestWR
     weakestWR := highVolWR
     weakestId := 4
@@ -199,12 +220,13 @@ if highVolMature and highVolWR < weakestWR
 bool disabledWeakest = autoDisable and weakestId != 0 and weakestWR < minWinRate
 bool regimeAllowed = not disabledWeakest or regimeId != weakestId
 
-// TRADING signal = original signal + optimizer filter.
-// DISPLAY signal remains rawBuySignal/rawSellSignal, so ALL signals stay visible.
 tradeBuySignal = confirmedBuySignal and regimeAllowed
 tradeSellSignal = confirmedSellSignal and regimeAllowed
 
-// -------------------- STRATEGY TESTER ORDERS --------------------
+// ============================================================
+// STRATEGY TESTER ORDERS
+// ============================================================
+
 var int orderBar = na
 
 if strategy.position_size == 0 and (tradeBuySignal or tradeSellSignal)
@@ -218,20 +240,59 @@ if strategy.position_size != 0 and not na(orderBar) and bar_index > orderBar
     strategy.close_all(comment="NEXT BAR")
     orderBar := na
 
-// -------------------- CHART SIGNALS --------------------
-// Historical + confirmed signals: BUY below candle, SELL above candle.
-string buyText = showSignalStrategy ? "BUY\n" + regime : "BUY"
-string sellText = showSignalStrategy ? "SELL\n" + regime : "SELL"
+// ============================================================
+// CLEAR HISTORICAL SIGNALS
+// BUY below candle, SELL above candle.
+// Separate plotshapes allow the strategy name to be shown.
+// ============================================================
 
-plotshape(showSignals and confirmedBuySignal, title="Historical BUY", style=shape.labelup, location=location.belowbar, text="BUY", size=size.tiny)
-plotshape(showSignals and confirmedSellSignal, title="Historical SELL", style=shape.labeldown, location=location.abovebar, text="SELL", size=size.tiny)
+string trendBuyText = showSignalStrategy ? "BUY\nTREND" : "BUY"
+string trendSellText = showSignalStrategy ? "SELL\nTREND" : "SELL"
 
-// Running/current candle signal. It can change while the candle is forming.
-plotshape(showLiveSignal and barstate.isrealtime and rawBuySignal and not barstate.isconfirmed, title="LIVE BUY", style=shape.labelup, location=location.belowbar, text="BUY", size=size.small)
-plotshape(showLiveSignal and barstate.isrealtime and rawSellSignal and not barstate.isconfirmed, title="LIVE SELL", style=shape.labeldown, location=location.abovebar, text="SELL", size=size.small)
+string breakoutBuyText = showSignalStrategy ? "BUY\nBREAKOUT" : "BUY"
+string breakoutSellText = showSignalStrategy ? "SELL\nBREAKOUT" : "SELL"
+
+string rangeBuyText = showSignalStrategy ? "BUY\nRANGE" : "BUY"
+string rangeSellText = showSignalStrategy ? "SELL\nRANGE" : "SELL"
+
+string highVolBuyText = showSignalStrategy ? "BUY\nHIGH VOL" : "BUY"
+string highVolSellText = showSignalStrategy ? "SELL\nHIGH VOL" : "SELL"
+
+// TREND
+plotshape(showSignals and confirmedBuySignal and regimeId == 1, title="BUY TREND", style=shape.labelup, location=location.belowbar, text=trendBuyText, size=size.tiny)
+plotshape(showSignals and confirmedSellSignal and regimeId == 1, title="SELL TREND", style=shape.labeldown, location=location.abovebar, text=trendSellText, size=size.tiny)
+
+// BREAKOUT
+plotshape(showSignals and confirmedBuySignal and regimeId == 2, title="BUY BREAKOUT", style=shape.labelup, location=location.belowbar, text=breakoutBuyText, size=size.tiny)
+plotshape(showSignals and confirmedSellSignal and regimeId == 2, title="SELL BREAKOUT", style=shape.labeldown, location=location.abovebar, text=breakoutSellText, size=size.tiny)
+
+// RANGE
+plotshape(showSignals and confirmedBuySignal and regimeId == 3, title="BUY RANGE", style=shape.labelup, location=location.belowbar, text=rangeBuyText, size=size.tiny)
+plotshape(showSignals and confirmedSellSignal and regimeId == 3, title="SELL RANGE", style=shape.labeldown, location=location.abovebar, text=rangeSellText, size=size.tiny)
+
+// HIGH VOLATILITY
+plotshape(showSignals and confirmedBuySignal and regimeId == 4, title="BUY HIGH VOL", style=shape.labelup, location=location.belowbar, text=highVolBuyText, size=size.tiny)
+plotshape(showSignals and confirmedSellSignal and regimeId == 4, title="SELL HIGH VOL", style=shape.labeldown, location=location.abovebar, text=highVolSellText, size=size.tiny)
+
+// ============================================================
+// LIVE SIGNAL
+// Only the current forming candle can show LIVE.
+// It may change/disappear before candle close.
+// ============================================================
+
+plotshape(showLiveSignal and barstate.isrealtime and rawBuySignal and not barstate.isconfirmed, title="LIVE BUY", style=shape.labelup, location=location.belowbar, text="LIVE BUY", size=size.small)
+plotshape(showLiveSignal and barstate.isrealtime and rawSellSignal and not barstate.isconfirmed, title="LIVE SELL", style=shape.labeldown, location=location.abovebar, text="LIVE SELL", size=size.small)
+
+// ============================================================
+// ALERTS
+// ============================================================
 
 alertcondition(rawBuySignal, title="MMC BUY", message="MMC BUY signal")
 alertcondition(rawSellSignal, title="MMC SELL", message="MMC SELL signal")
+
+// ============================================================
+// STATS
+// ============================================================
 
 totalWins = trendWins + breakoutWins + rangeWins + highVolWins
 totalLosses = trendLosses + breakoutLosses + rangeLosses + highVolLosses
@@ -242,6 +303,7 @@ string weakestName = weakestId == 1 ? "TREND" : weakestId == 2 ? "BREAKOUT" : we
 string statusText = disabledWeakest ? "OFF: " + weakestName + " (" + str.tostring(weakestWR, "#.##") + "%)" : "ALL ON"
 
 var table t = table.new(position.top_right, 6, 6, border_width=1)
+
 if showStats and barstate.islast
     table.cell(t, 0, 0, "STRATEGY")
     table.cell(t, 1, 0, "WIN")
