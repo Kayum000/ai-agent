@@ -33,7 +33,18 @@ class MainActivity : Activity() {
   findViewById<Button>(R.id.settings).setOnClickListener { settings() }
   findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
   tts=TextToSpeech(this) { result ->
-   if(result==TextToSpeech.SUCCESS) tts?.setLanguage(Locale.forLanguageTag("bn-BD"))
+   if(result==TextToSpeech.SUCCESS) {
+    val engine=tts
+    val female=engine?.voices?.firstOrNull {
+     val n=it.name.lowercase()
+     n.contains("female") || n.contains("woman") || n.contains("sfg") || n.contains("fem")
+    }
+    if(female!=null) engine.voice=female
+    val bn=engine?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
+    if(bn==TextToSpeech.LANG_MISSING_DATA || bn==TextToSpeech.LANG_NOT_SUPPORTED) engine?.setLanguage(Locale.US)
+    engine?.setPitch(1.12f)
+    engine?.setSpeechRate(0.96f)
+   }
   }
   refreshStatus()
  }
@@ -80,7 +91,9 @@ class MainActivity : Activity() {
   val clean=text.trim(); if(clean.isEmpty()) return
   val r=tts?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
   if(r==TextToSpeech.LANG_MISSING_DATA || r==TextToSpeech.LANG_NOT_SUPPORTED) tts?.setLanguage(Locale.US)
-  tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "agent_reply")
+  tts?.setPitch(1.12f)
+  tts?.setSpeechRate(0.96f)
+  tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "siri_reply")
  }
 
  private fun sendPcCommandSync(command:String):String {
