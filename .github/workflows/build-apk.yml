@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,35 +17,13 @@ jobs:
           java-version: '17'
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Prepare release signing
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Build installable APK
+        run: gradle assembleDebug
+      - name: Verify APK
         run: |
-          set -e
-          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
-            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "Using configured release signing key."
-          else
-            echo "ERROR: Release signing secrets are not configured."
-            echo "Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD in GitHub Actions secrets."
-            exit 1
-          fi
-      - name: Build signed release APK
-        env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
-        run: |
-          gradle assembleRelease
-      - name: Verify APK signature
-        run: |
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
-      - name: Upload signed release APK
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: My-PC-AI-Agent-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          name: My-PC-AI-Agent-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
