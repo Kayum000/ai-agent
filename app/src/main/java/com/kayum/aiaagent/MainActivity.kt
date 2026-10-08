@@ -35,9 +35,12 @@ class MainActivity : Activity() {
   tts=TextToSpeech(this) { result ->
    if(result==TextToSpeech.SUCCESS) {
     val engine=tts
-    val female=engine?.voices?.firstOrNull {
-     val n=it.name.lowercase()
-     n.contains("female") || n.contains("woman") || n.contains("sfg") || n.contains("fem") || n.contains("female")
+    val female=engine?.voices?.filter { v ->
+     val n=v.name.lowercase(); val l=v.locale.language.lowercase()
+     (n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")) && l in setOf("bn","en","hi")
+    }?.firstOrNull() ?: engine?.voices?.firstOrNull { v ->
+     val n=v.name.lowercase()
+     n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")
     }
     if(female!=null) engine.voice=female
     val bn=engine?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
