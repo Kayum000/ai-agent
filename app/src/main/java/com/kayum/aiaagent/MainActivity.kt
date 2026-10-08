@@ -22,7 +22,7 @@ class MainActivity : Activity() {
  private var speakNext = false
  private val voiceReq=42
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
- private val model = "gemini-2.5-flash-lite"
+ private val models = listOf("gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite")
  private val pcToken = "mmc-local-test-token"
 
  override fun onCreate(b: Bundle?) {
@@ -35,9 +35,12 @@ class MainActivity : Activity() {
   tts=TextToSpeech(this) { result ->
    if(result==TextToSpeech.SUCCESS) {
     val engine=tts
-    val female=engine?.voices?.firstOrNull {
-     val n=it.name.lowercase()
-     n.contains("female") || n.contains("woman") || n.contains("sfg") || n.contains("fem") || n.contains("female")
+    val female=engine?.voices?.filter { v ->
+     val n=v.name.lowercase(); val l=v.locale.language.lowercase()
+     (n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")) && l in setOf("bn","en","hi")
+    }?.firstOrNull() ?: engine?.voices?.firstOrNull { v ->
+     val n=v.name.lowercase()
+     n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")
     }
     if(female!=null) engine.voice=female
     val bn=engine?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
@@ -52,9 +55,9 @@ class MainActivity : Activity() {
  private fun refreshStatus() {
   val pc=prefs.getString("pc_url", "").orEmpty()
   status.text = if (pc.isNotBlank())
-   "PC Agent: configured • Cloud AI: " + if (prefs.getString("gemini_key", "").orEmpty().isNotBlank()) model else "not configured"
+   "PC Agent: configured • Cloud AI: " + if (prefs.getString("gemini_key", "").orEmpty().isNotBlank()) "auto-fallback" else "not configured"
   else if (prefs.getString("gemini_key", "").orEmpty().isNotBlank())
-   "Cloud AI: Gemini configured • " + model + " • PC Agent: not configured"
+   "Cloud AI: Gemini configured • " + "auto-fallback • PC Agent: not configured"
   else "Cloud AI: add Gemini API key • PC Agent optional"
  }
 
@@ -114,25 +117,35 @@ class MainActivity : Activity() {
  private fun askGemini(prompt:String):String {
   val key=prefs.getString("gemini_key","").orEmpty()
   if(key.isBlank()) return "Gemini key সেট করা নেই। ⚙ Settings খুলে আপনার নিজের API key দিন।"
-  return try {
-   val url=URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent")
-   val conn=url.openConnection() as HttpURLConnection
-   conn.requestMethod="POST"; conn.connectTimeout=20000; conn.readTimeout=60000
-   conn.setRequestProperty("Content-Type","application/json"); conn.setRequestProperty("x-goog-api-key",key); conn.doOutput=true
-   val body=org.json.JSONObject().put("contents", org.json.JSONArray().put(
-    org.json.JSONObject().put("parts", org.json.JSONArray().put(org.json.JSONObject().put("text",
-     "You are My PC AI Agent. Answer clearly in Bengali or English matching the user. Do not claim you performed PC actions unless connected to the PC agent. User request: " + prompt
-    )))
-   )).toString()
-   conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-   val code=conn.responseCode
-   val stream=if(code in 200..299) conn.inputStream else conn.errorStream
-   val text=stream?.bufferedReader()?.use { it.readText() } ?: ""
-   if(code !in 200..299) return "Cloud AI error (" + code + "). API key/model access check করুন।"
-   org.json.JSONObject(text).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")
-    ?.optJSONArray("parts")?.optJSONObject(0)?.optString("text")
-    ?.takeIf { it.isNotBlank() } ?: "AI কোনো text response দেয়নি।"
-  } catch(e:Exception) { "Cloud AI connection error: " + (e.message ?: "unknown error") }
+  var lastError = ""
+  for (model in models) {
+   try {
+    val url=URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent")
+    val conn=url.openConnection() as HttpURLConnection
+    conn.requestMethod="POST"; conn.connectTimeout=20000; conn.readTimeout=60000
+    conn.setRequestProperty("Content-Type","application/json"); conn.setRequestProperty("x-goog-api-key",key); conn.doOutput=true
+    val body=org.json.JSONObject().put("contents", org.json.JSONArray().put(
+     org.json.JSONObject().put("parts", org.json.JSONArray().put(org.json.JSONObject().put("text",
+      "You are My PC AI Agent. Answer clearly in Bengali or English matching the user. Do not claim you performed PC actions unless connected to the PC agent. User request: " + prompt
+     )))
+    )).toString()
+    conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+    val code=conn.responseCode
+    val stream=if(code in 200..299) conn.inputStream else conn.errorStream
+    val text=stream?.bufferedReader()?.use { it.readText() } ?: ""
+    if(code in 200..299) {
+     return org.json.JSONObject(text).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")
+      ?.optJSONArray("parts")?.optJSONObject(0)?.optString("text")
+      ?.takeIf { it.isNotBlank() } ?: "AI কোনো text response দেয়নি।"
+    }
+    lastError = "model=$model HTTP $code " + runCatching {
+     org.json.JSONObject(text).optJSONObject("error")?.optString("message")
+    }.getOrNull().orEmpty()
+   } catch(e:Exception) {
+    lastError = "model=$model " + (e.message ?: "unknown error")
+   }
+  }
+  return "Cloud AI সব configured model-এ কাজ করেনি। $lastError"
  }
 
  private fun testPcAgent() {
