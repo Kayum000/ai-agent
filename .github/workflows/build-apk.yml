@@ -41,7 +41,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
         run: |
-          ./gradlew assembleRelease
+          gradle assembleRelease
       - name: Verify APK signature
         run: |
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
