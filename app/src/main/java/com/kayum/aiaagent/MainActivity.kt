@@ -92,8 +92,19 @@ class MainActivity : Activity() {
     val code=conn.responseCode
     val body=(if(code in 200..299) conn.inputStream else conn.errorStream).bufferedReader().use { it.readText() }
     runOnUiThread {
-     status.text="PC Agent: CONNECTED • HTTP $code"
-     chat.append("\n\nPC Test: CONNECTED\n" + body)
+     if(code in 200..299) {
+      status.text="PC Agent: CONNECTED • testing command…"
+      chat.append("\n\nPC Test: CONNECTED\n" + body + "\nCommand Test: sending system info…")
+     } else {
+      status.text="PC Agent: HTTP " + code
+      chat.append("\n\nPC Test: FAILED\nHTTP " + code + "\n" + body)
+     }
+    }
+    if(code in 200..299) {
+     sendPcCommand("system info") { result ->
+      status.text = if(result.startsWith("HTTP 200:")) "PC Agent: COMMAND OK" else "PC Agent: command failed"
+      chat.append("\nCommand Test Result:\n" + result)
+     }
     }
    } catch(e:Exception) {
     runOnUiThread {
@@ -118,7 +129,7 @@ class MainActivity : Activity() {
     val code=conn.responseCode
     val stream=if(code in 200..299) conn.inputStream else conn.errorStream
     val text=stream.bufferedReader().use { it.readText() }
-    "HTTP $code: $text"
+    "HTTP " + code + ": " + text
    } catch(e:Exception) { "PC Agent error: " + (e.message ?: "unknown error") }
    runOnUiThread { callback(result) }
   }
@@ -138,7 +149,7 @@ class MainActivity : Activity() {
   if(phone.isBlank() || msg.isBlank()) { Toast.makeText(this,"Phone number and message required",Toast.LENGTH_SHORT).show(); return }
   if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED){ requestPermissions(arrayOf(Manifest.permission.SEND_SMS),smsReq); return }
   try { SmsManager.getDefault().sendTextMessage(phone,null,msg,null,null); Toast.makeText(this,"SMS send requested",Toast.LENGTH_SHORT).show() }
-  catch(e:Exception) { Toast.makeText(this,"SMS failed: ${e.message}",Toast.LENGTH_LONG).show() }
+  catch(e:Exception) { Toast.makeText(this,"SMS failed: " + (e.message ?: "unknown error"),Toast.LENGTH_LONG).show() }
  }
 
  private fun settings() {
