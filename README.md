@@ -17,3 +17,6 @@ Never commit an API key to this repository.
 
 
 <!-- APK build trigger: 2026-10-08 -->
+
+
+Unified Mobile + PC Agent build enabled.
