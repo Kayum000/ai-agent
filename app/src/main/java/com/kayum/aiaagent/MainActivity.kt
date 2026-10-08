@@ -22,7 +22,7 @@ class MainActivity : Activity() {
  private var speakNext = false
  private val voiceReq=42
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
- private val model = "gemini-2.5-flash-lite"
+ private val model = "gemini-3.5-flash-lite"
  private val pcToken = "mmc-local-test-token"
 
  override fun onCreate(b: Bundle?) {
