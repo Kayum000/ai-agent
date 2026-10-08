@@ -42,7 +42,7 @@ class MainActivity : Activity() {
      val n=v.name.lowercase()
      n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")
     }
-    if(female!=null) engine.voice=female
+    if(female!=null) engine?.voice=female
     val bn=engine?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
     if(bn==TextToSpeech.LANG_MISSING_DATA || bn==TextToSpeech.LANG_NOT_SUPPORTED) engine?.setLanguage(Locale.US)
     engine?.setPitch(1.12f)
