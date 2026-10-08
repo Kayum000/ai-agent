@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.widget.*
+import android.telephony.SmsManager
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -17,6 +18,7 @@ class MainActivity : Activity() {
  private lateinit var input: EditText
  private lateinit var status: TextView
  private val voiceReq=42
+ private val smsReq=43
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
  private val model = "gemini-2.5-flash-lite"
 
@@ -26,6 +28,7 @@ class MainActivity : Activity() {
   findViewById<Button>(R.id.send).setOnClickListener { send() }
   findViewById<Button>(R.id.voice).setOnClickListener { voice() }
   findViewById<Button>(R.id.settings).setOnClickListener { settings() }
+  findViewById<Button>(R.id.sms).setOnClickListener { smsDialog() }
   refreshStatus()
  }
 
@@ -73,6 +76,23 @@ class MainActivity : Activity() {
   } catch(e:Exception) { "Cloud AI connection error: " + (e.message ?: "unknown error") }
  }
 
+ private fun smsDialog() {
+  val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(40,10,40,10) }
+  val phone=EditText(this).apply { hint="Phone number"; inputType=android.text.InputType.TYPE_CLASS_PHONE }
+  val msg=EditText(this).apply { hint="SMS message"; minLines=3; gravity=android.view.Gravity.TOP }
+  box.addView(phone); box.addView(msg)
+  AlertDialog.Builder(this).setTitle("Send SMS").setView(box)
+   .setPositiveButton("Send") { _,_ -> sendSms(phone.text.toString().trim(), msg.text.toString()) }
+   .setNegativeButton("Cancel",null).show()
+ }
+
+ private fun sendSms(phone:String, msg:String) {
+  if(phone.isBlank() || msg.isBlank()) { Toast.makeText(this,"Phone number and message required",Toast.LENGTH_SHORT).show(); return }
+  if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED){ requestPermissions(arrayOf(Manifest.permission.SEND_SMS),smsReq); return }
+  try { SmsManager.getDefault().sendTextMessage(phone,null,msg,null,null); Toast.makeText(this,"SMS send requested",Toast.LENGTH_SHORT).show() }
+  catch(e:Exception) { Toast.makeText(this,"SMS failed: ${e.message}",Toast.LENGTH_LONG).show() }
+ }
+
  private fun settings() {
   val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(40,10,40,10) }
   val key=EditText(this).apply {
@@ -98,6 +118,11 @@ class MainActivity : Activity() {
    putExtra(RecognizerIntent.EXTRA_LANGUAGE,"bn-BD")
    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
   },voiceReq)
+ }
+
+ override fun onRequestPermissionsResult(requestCode:Int, permissions:Array<out String>, grantResults:IntArray){
+  super.onRequestPermissionsResult(requestCode,permissions,grantResults)
+  if(requestCode==smsReq) Toast.makeText(this, if(grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED) "SMS permission granted. Tap Send SMS again." else "SMS permission denied", Toast.LENGTH_SHORT).show()
  }
 
  override fun onActivityResult(r:Int,c:Int,d:Intent?){
