@@ -14,3 +14,6 @@ Native Android AI-agent app.
 The app currently uses the Gemini API model `gemini-2.5-flash-lite`. A Gemini API key is required for cloud chat. Free-tier availability and limits are controlled by Google and can change.
 
 Never commit an API key to this repository.
+
+
+<!-- APK build trigger: 2026-10-08 -->
