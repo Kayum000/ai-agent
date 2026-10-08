@@ -22,7 +22,7 @@ class MainActivity : Activity() {
  private var speakNext = false
  private val voiceReq=42
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
- private val model = "gemini-3.5-flash-lite"
+ private val model = "gemini-2.5-flash-lite"
  private val pcToken = "mmc-local-test-token"
 
  override fun onCreate(b: Bundle?) {
@@ -37,7 +37,7 @@ class MainActivity : Activity() {
     val engine=tts
     val female=engine?.voices?.firstOrNull {
      val n=it.name.lowercase()
-     n.contains("female") || n.contains("woman") || n.contains("sfg") || n.contains("fem")
+     n.contains("female") || n.contains("woman") || n.contains("sfg") || n.contains("fem") || n.contains("female")
     }
     if(female!=null) engine.voice=female
     val bn=engine?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
