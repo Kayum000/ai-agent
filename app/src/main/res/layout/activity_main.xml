@@ -20,5 +20,6 @@
  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
   <Button android:id="@+id/voice" android:text="🎤 Voice" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
   <Button android:id="@+id/settings" android:text="⚙ Settings" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+  <Button android:id="@+id/sms" android:text="✉ SMS" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
  </LinearLayout>
 </LinearLayout>
