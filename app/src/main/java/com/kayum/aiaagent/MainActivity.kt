@@ -156,7 +156,7 @@ class MainActivity : Activity() {
    val base=prefs.getString("pc_url","").orEmpty().trim()
    if(base.isBlank()) return "PC Agent URL not configured"
    val conn=URL(base.trimEnd('/') + "/api/mobile/command").openConnection() as HttpURLConnection
-   conn.requestMethod="POST"; conn.connectTimeout=10000; conn.readTimeout=90000
+   conn.requestMethod="POST"; conn.connectTimeout=10000; conn.readTimeout=180000
    conn.setRequestProperty("Content-Type","application/json")
    conn.setRequestProperty("X-PC-Agent-Token", prefs.getString("pc_token", "").orEmpty()); conn.doOutput=true
    conn.outputStream.use { it.write(org.json.JSONObject().put("command",command).toString().toByteArray(Charsets.UTF_8)) }
