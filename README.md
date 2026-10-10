@@ -18,10 +18,10 @@ Requirements: Python 3.10 or newer; no third-party Python packages are needed.
 
 1. On the PC, download/clone this repository.
 2. Open a terminal in the repository folder and run:
-   \`python pc_agent/server.py\`
+   `python pc_agent/server.py`
 3. On first run, the server creates a random authentication token and prints it in the terminal. Keep it private. It is also saved in the user's config folder.
-4. Find the PC's private LAN IPv4 address (Windows: \`ipconfig\`; macOS/Linux: \`ip addr\` or network settings).
-5. Connect the phone and PC to the same trusted Wi-Fi network. In Android app Settings, enter \`http://PC-LAN-IP:8765\` and the token printed by the PC.
+4. Find the PC's private LAN IPv4 address (Windows: `ipconfig`; macOS/Linux: `ip addr` or network settings).
+5. Connect the phone and PC to the same trusted Wi-Fi network. In Android app Settings, enter `http://PC-LAN-IP:8765` and the token printed by the PC.
 6. Tap **PC Test**.
 
 The companion server currently supports allow-listed actions only: open a normal HTTP(S) website, open a browser/Chrome/Notepad/Calculator/file manager/VS Code when available, and report basic system/disk information. Unsupported requests fall back to Gemini chat. It deliberately does **not** execute arbitrary shell commands, scripts, or destructive operations.
@@ -35,4 +35,4 @@ The companion server currently supports allow-listed actions only: open a normal
 
 ## Cloud AI
 
-The app tries \`gemini-2.5-flash-lite\` and then \`gemini-2.5-flash\`. Model availability and API quotas are controlled by Google and may change.
+The app tries `gemini-2.5-flash-lite` and then `gemini-2.5-flash`. Model availability and API quotas are controlled by Google and may change.
