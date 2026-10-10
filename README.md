@@ -36,3 +36,25 @@ The companion server currently supports allow-listed actions only: open a normal
 ## Cloud AI
 
 The app tries `gemini-2.5-flash-lite` and then `gemini-2.5-flash`. Model availability and API quotas are controlled by Google and may change.
+
+## Binary signal, live collector, and screenshot OCR
+
+The PC companion exposes authenticated, signal-only endpoints:
+
+- `POST /api/collector/quotex` — accepts normalized candles/ticks from the local collector.
+- `POST /api/binary/signal` — returns `CALL`, `PUT`, or `NO TRADE`; expiry is selected automatically by the existing rule-based market-regime heuristic (60–300 seconds).
+- `POST /api/screenshot/analyze` — accepts JSON `{"image_base64":"..."}` (raw base64 or a data URL) and extracts visible text using optional OCR dependencies.
+
+### Enable screenshot OCR
+
+Install Python packages `Pillow` and `pytesseract`, and install the Tesseract OCR executable for your operating system. OCR is intentionally conservative and does **not** interpret candle shapes or claim to be a vision AI. If the screenshot contains no single unambiguous visible direction label, the result has no direction and should not be used as a trade signal.
+
+Send the OCR response's object as `screenshot_analysis` to `POST /api/binary/signal`, alongside current closed candles. The signal engine checks screenshot age and asset mismatch. Use fresh live data; stale data produces `NO TRADE`. All endpoints require the existing `X-PC-Agent-Token` header. This remains signal-only and never places orders.
+
+Example screenshot request body:
+
+```json
+{"image_base64":"<base64-encoded PNG or JPEG>"}
+```
+
+The endpoint accepts up to 7.5 MB of decoded image data. Do not send account credentials, cookies, session tokens, or personal information in screenshots.
