@@ -38,17 +38,7 @@ class MainActivity : Activity() {
      engine.setLanguage(Locale.US)
      "en"
     } else "bn"
-    val voices = engine.voices.orEmpty()
-    fun soundsFemale(v: android.speech.tts.Voice): Boolean {
-     val n=v.name.lowercase()
-     return n.contains("female") || n.contains("woman") || n.contains("fem") ||
-      n.contains("sfg") || n.contains("zira") || n.contains("jenny") ||
-      n.contains("aria") || n.contains("samantha") || n.contains("victoria")
-    }
-    val preferred = voices.firstOrNull { it.locale.language.equals(wantedLanguage,true) && soundsFemale(it) }
-     ?: voices.firstOrNull { it.locale.language.equals(wantedLanguage,true) }
-     ?: voices.firstOrNull { soundsFemale(it) }
-    if(preferred!=null) engine.voice=preferred
+    applyPreferredVoice(engine, wantedLanguage)
     engine.setPitch(1.12f)
     engine.setSpeechRate(0.96f)
    } else {
@@ -131,13 +121,34 @@ class MainActivity : Activity() {
   return "এই কমান্ডটি সমর্থিত নয়। PC-তে চালাতে 'PC: open Chrome' লিখুন, আর ফোনে চালাতে 'PHONE: open WhatsApp' লিখুন।"
  }
 
+ private fun applyPreferredVoice(engine: TextToSpeech, language: String) {
+  val voices = engine.voices.orEmpty()
+  fun soundsFemale(v: android.speech.tts.Voice): Boolean {
+   val n=v.name.lowercase()
+   return n.contains("female") || n.contains("woman") || n.contains("fem") ||
+    n.contains("sfg") || n.contains("zira") || n.contains("jenny") ||
+    n.contains("aria") || n.contains("samantha") || n.contains("victoria")
+  }
+  // Prefer a female-sounding voice for the active language, then any female voice.
+  val preferred = voices.firstOrNull { it.locale.language.equals(language,true) && soundsFemale(it) }
+   ?: voices.firstOrNull { soundsFemale(it) }
+   ?: voices.firstOrNull { it.locale.language.equals(language,true) }
+  if(preferred!=null) engine.voice=preferred
+ }
+
  private fun speak(text:String) {
   val clean=text.trim(); if(clean.isEmpty()) return
-  val r=tts?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
-  if(r==TextToSpeech.LANG_MISSING_DATA || r==TextToSpeech.LANG_NOT_SUPPORTED) tts?.setLanguage(Locale.US)
-  tts?.setPitch(1.12f)
-  tts?.setSpeechRate(0.96f)
-  tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "siri_reply")
+  val engine=tts ?: return
+  val r=engine.setLanguage(Locale.forLanguageTag("bn-BD"))
+  val language = if(r==TextToSpeech.LANG_MISSING_DATA || r==TextToSpeech.LANG_NOT_SUPPORTED) {
+   engine.setLanguage(Locale.US)
+   "en"
+  } else "bn"
+  // Re-apply after setLanguage because some TTS engines reset the selected voice.
+  applyPreferredVoice(engine, language)
+  engine.setPitch(1.12f)
+  engine.setSpeechRate(0.96f)
+  engine.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "siri_reply")
  }
 
  private fun sendPcCommandSync(command:String):String {
