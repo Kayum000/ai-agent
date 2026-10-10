@@ -74,19 +74,24 @@ class MainActivity : Activity() {
  }
 
  private fun handleAgentRequest(prompt:String):String {
-  val phone = PhoneAgent.handle(this, prompt)
-  if (phone != null && !phone.startsWith("Phone Control চালু নেই")) return phone
   val pc = prefs.getString("pc_url", "").orEmpty().trim()
   if (pc.isNotBlank()) {
-   val result = sendPcCommandSync(prompt)
+   val command = prompt.removePrefix("PC:").removePrefix("pc:").trim()
+   val result = sendPcCommandSync(command)
    if (result.startsWith("HTTP 200:")) {
     val body = result.removePrefix("HTTP 200: ")
     try {
      val json = org.json.JSONObject(body)
      if (json.optBoolean("handled", false)) return json.optString("response").ifBlank { "PC task completed." }
     } catch(_:Exception) { }
+   } else if (result.startsWith("HTTP 401:")) {
+    return "PC Agent token ভুল। Settings-এ PC token ঠিক করে আবার চেষ্টা করুন।"
+   } else if (result.startsWith("HTTP 404:")) {
+    return "PC Agent endpoint পাওয়া যায়নি। Settings-এ PC Agent URL পরীক্ষা করুন।"
    }
   }
+  val phone = PhoneAgent.handle(this, prompt)
+  if (phone != null && !phone.startsWith("Phone Control চালু নেই")) return phone
   return askGemini(prompt)
  }
 
@@ -126,7 +131,7 @@ class MainActivity : Activity() {
     conn.setRequestProperty("Content-Type","application/json"); conn.setRequestProperty("x-goog-api-key",key); conn.doOutput=true
     val body=org.json.JSONObject().put("contents", org.json.JSONArray().put(
      org.json.JSONObject().put("parts", org.json.JSONArray().put(org.json.JSONObject().put("text",
-      "You are My PC AI Agent. Answer clearly in Bengali or English matching the user. Do not claim you performed PC actions unless connected to the PC agent. User request: " + prompt
+      "You are My PC AI Agent. Answer clearly in Bengali or English matching the user. Never claim you performed a phone or PC action unless the app has confirmed it succeeded. If an action was not executed, explain that honestly. User request: " + prompt
      )))
     )).toString()
     conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
