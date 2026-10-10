@@ -1,34 +1,32 @@
-# PC AI Agent — Self-Repair Module
+# PC Companion — Self-Repair Module
 
-This folder adds a safe self-diagnosis/self-repair layer for the PC agent.
+This folder includes a safe self-diagnosis/self-repair helper for the PC companion.
 
-It does not execute arbitrary commands, modify Windows system files, change registry settings, or overwrite source code. Repairs are restricted to the agent's own runtime/ directory.
+It does not execute arbitrary commands, modify Windows system files, change registry settings, or overwrite source code. Repairs are restricted to the agent's own `runtime/` directory.
 
-Use from the existing PC server:
+Use from Python:
 
-~~~python
+```python
 from pc_agent.self_repair import diagnose, repair
 
-# GET /health
-return {"status": "ok", "self_repair": diagnose()}
+print(diagnose())
+print(repair())
+```
 
-# POST /api/mobile/command
-if command.strip().lower() in {"self repair", "self-repair", "fix yourself", "নিজেকে ঠিক করো"}:
-    return {"response": "Self-repair complete", "diagnostics": repair()}
-~~~
+For the mobile app, use the existing LAN endpoint:
 
-For the mobile app, keep the existing LAN endpoint:
-
+```
 http://<PC-LAN-IP>:8765
+```
 
-and the existing /api/mobile/command + X-PC-Agent-Token contract.
+The Android app communicates with `/api/mobile/command` using the `X-PC-Agent-Token` header.
 
 The repair layer handles missing runtime directories, missing/corrupt local config, stale temporary files, and basic Python/port diagnostics.
 
 Run directly:
 
-~~~bash
+```bash
 python pc_agent/self_repair.py
-~~~
+```
 
-The Android app also tries multiple supported Gemini models automatically when one model returns an access/404 error.
+The project does not include Gemini integration, cloud AI fallback, or a Gemini API-key setting. Mobile requests are handled locally by built-in allow-listed phone actions or by the PC companion's allow-listed commands; unsupported requests return a message instead of being sent to a cloud model.
