@@ -7,8 +7,8 @@ import time
 from typing import Any
 
 _LOCK = threading.Lock()
-_LATEST: dict[str, Any] | None = None
-_LATEST_AT = 0.0
+_LATEST: dict[str, dict[str, Any]] = {}
+_LATEST_AT: dict[str, float] = {}
 MAX_AGE = 180
 MAX_CANDLES = 500
 
@@ -77,34 +77,63 @@ def _direction(value):
 
 
 def ingest_collector_payload(payload):
-    """Validate and cache a recent Quotex Collector snapshot."""
+    """Validate and cache recent candle/tick snapshots separately for each asset."""
     global _LATEST, _LATEST_AT
     if not isinstance(payload, dict):
         return {"ok": False, "error": "JSON object required"}
-    candles = _candles(payload.get("candles"))
-    ticks = []
+    fallback_asset = str(payload.get("asset") or payload.get("symbol") or payload.get("active_asset") or "").strip()[:80]
+    raw_candles = payload.get("candles") or []
     raw_ticks = payload.get("ticks") or payload.get("quotes") or []
+    candle_groups = {}
+    tick_groups = {}
+    if isinstance(raw_candles, list):
+        for row in raw_candles[-MAX_CANDLES * 20:]:
+            if not isinstance(row, dict):
+                continue
+            asset = str(row.get("asset") or row.get("symbol") or fallback_asset or "UNKNOWN").strip()[:80]
+            candle_groups.setdefault(asset, []).append(row)
     if isinstance(raw_ticks, list):
-        for t in raw_ticks[-2000:]:
-            if not isinstance(t, dict): continue
-            ts = _ts(t.get("timestamp", t.get("time")))
-            price = _num(t.get("price", t.get("close")))
+        for row in raw_ticks[-2000:]:
+            if not isinstance(row, dict):
+                continue
+            asset = str(row.get("asset") or row.get("symbol") or fallback_asset or "UNKNOWN").strip()[:80]
+            ts = _ts(row.get("timestamp", row.get("time")))
+            price = _num(row.get("price", row.get("close")))
             if ts is not None and price is not None and price > 0:
-                ticks.append({"timestamp": ts, "price": price})
-    if not candles and not ticks:
+                tick_groups.setdefault(asset, []).append({"timestamp": ts, "price": price})
+    assets = set(candle_groups) | set(tick_groups)
+    if not assets:
         return {"ok": False, "error": "No valid candles or ticks"}
-    snap = {"asset": str(payload.get("asset") or payload.get("symbol") or "UNKNOWN")[:80],
-            "candles": candles, "ticks": ticks, "received_at": time.time()}
+    accepted_candles = accepted_ticks = 0
+    now = time.time()
     with _LOCK:
-        _LATEST, _LATEST_AT = snap, snap["received_at"]
-    return {"ok": True, "asset": snap["asset"], "accepted_candles": len(candles), "accepted_ticks": len(ticks)}
+        for asset in assets:
+            candles = _candles(candle_groups.get(asset, []))
+            ticks = tick_groups.get(asset, [])
+            previous = _LATEST.get(asset)
+            # Tick-only updates must not erase candle history for that asset.
+            if previous:
+                if not candles:
+                    candles = previous.get("candles", [])
+                if not ticks:
+                    ticks = previous.get("ticks", [])
+                elif previous.get("ticks"):
+                    ticks = (previous["ticks"] + ticks)[-2000:]
+            _LATEST[asset] = {"asset": asset, "candles": candles, "ticks": ticks, "received_at": now}
+            _LATEST_AT[asset] = now
+            accepted_candles += len(candle_groups.get(asset, []))
+            accepted_ticks += len(tick_groups.get(asset, []))
+    return {"ok": True, "assets": sorted(assets), "accepted_candles": accepted_candles, "accepted_ticks": accepted_ticks}
 
 
-def latest_collector_payload():
+def latest_collector_payload(asset=None):
     with _LOCK:
-        if _LATEST is None or time.time() - _LATEST_AT > MAX_AGE:
-            return None
-        return dict(_LATEST)
+        if asset:
+            key = str(asset).strip()
+            snap, stamp = _LATEST.get(key), _LATEST_AT.get(key, 0.0)
+            return dict(snap) if snap and time.time() - stamp <= MAX_AGE else None
+        fresh = [(stamp, _LATEST[key]) for key, stamp in _LATEST_AT.items() if time.time() - stamp <= MAX_AGE]
+        return dict(max(fresh, key=lambda item: item[0])[1]) if fresh else None
 
 
 def generate_binary_signal(payload):
@@ -116,7 +145,7 @@ def generate_binary_signal(payload):
     ticks = payload.get("ticks")
     source = str(payload.get("source") or "live_collector")
     if not isinstance(rows, list) or not rows:
-        cached = latest_collector_payload()
+        cached = latest_collector_payload(asset or None)
         if cached:
             rows, ticks, asset, source = cached["candles"], ticks or cached["ticks"], asset or cached["asset"], "live_collector"
     x = _candles(rows)
