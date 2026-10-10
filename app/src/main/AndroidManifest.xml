@@ -1,6 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <queries>
+  <package android:name="com.android.chrome"/>
+  <package android:name="com.google.android.youtube"/>
+  <package android:name="com.whatsapp"/>
+  <package android:name="org.telegram.messenger"/>
+  <package android:name="com.facebook.katana"/>
+  <package android:name="com.android.settings"/>
+  <package android:name="com.android.vending"/>
+ </queries>
  <uses-permission android:name="android.permission.INTERNET"/>
- <application android:theme="@style/AppTheme" android:label="My PC AI Agent" android:usesCleartextTraffic="false">
+ <application android:theme="@style/AppTheme" android:label="My PC AI Agent" android:usesCleartextTraffic="true">
   <activity android:name=".MainActivity" android:exported="true">
    <intent-filter>
     <action android:name="android.intent.action.MAIN"/>
