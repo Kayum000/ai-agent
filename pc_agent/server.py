@@ -20,7 +20,7 @@ import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 import re
 
 try:
@@ -283,6 +283,64 @@ def handle_command(command: str) -> dict:
                 ok, response = open_app(app)
                 return {"ok": ok, "handled": True, "action": "open_app", "response": response}
 
+    # Web search opens a normal browser search URL.
+    search_match = re.search(r"(?:search(?:\s+for)?|খুঁজো|খুঁজে দাও|সার্চ করো|সার্চ)\s+(.+)$", raw, flags=re.IGNORECASE)
+    if search_match:
+        query = search_match.group(1).strip()
+        if query:
+            target = "https://www.google.com/search?q=" + quote_plus(query)
+            opened = webbrowser.open(target)
+            return {"ok": bool(opened), "handled": True, "action": "web_search",
+                    "response": f"Browser search opened for: {query}" if opened else "PC browser পাওয়া যায়নি।"}
+
+    if any(w in low for w in ("what time is it", "current time", "time now", "এখন কয়টা বাজে", "এখন কয়টা বাজে", "সময় বলো", "সময় বলো")):
+        from datetime import datetime
+        return {"ok": True, "handled": True, "action": "time",
+                "response": datetime.now().strftime("এখন সময় %I:%M:%S %p")}
+
+    if any(w in low for w in ("list files", "show desktop files", "ফাইল লিস্ট", "ডেস্কটপের ফাইল", "ফাইল দেখাও")):
+        desktop = Path.home() / "Desktop"
+        if not desktop.is_dir():
+            return {"ok": False, "handled": True, "action": "list_files", "response": "Desktop folder পাওয়া যায়নি।"}
+        rows = [("DIR  " if item.is_dir() else "FILE  ") + item.name
+                for item in sorted(desktop.iterdir(), key=lambda item: item.name.lower())[:100]]
+        return {"ok": True, "handled": True, "action": "list_files", "response": "\n".join(rows) or "Desktop ফোল্ডার খালি।"}
+
+    folder_match = re.search(r"(?:create|make)\s+(?:a\s+)?folder(?:\s+(?:named|called))?\s+(.+)$", raw, flags=re.IGNORECASE)
+    if not folder_match:
+        folder_match = re.search(r"(?:ফোল্ডার\s+বানাও|ফোল্ডার\s+তৈরি\s+করো)\s+(.+)$", raw, flags=re.IGNORECASE)
+    if folder_match:
+        name = folder_match.group(1).strip().strip("\"'")
+        if not name or name in {".", ".."} or "/" in name or "\\" in name or Path(name).name != name:
+            return {"ok": False, "handled": True, "action": "make_folder", "response": "নিরাপত্তার জন্য শুধু একটি সাধারণ folder name ব্যবহার করুন।"}
+        try:
+            desktop = Path.home() / "Desktop"
+            desktop.mkdir(parents=True, exist_ok=True)
+            target = desktop / name
+            target.mkdir(exist_ok=True)
+            return {"ok": True, "handled": True, "action": "make_folder", "response": f"Folder ready: {target}"}
+        except OSError:
+            return {"ok": False, "handled": True, "action": "make_folder", "response": "Desktop-এ folder তৈরি করা যায়নি।"}
+
+    file_match = re.search(r"(?:create|make)\s+(?:a\s+)?file\s+(.+?)(?:\s+with\s+content:?\s+([\s\S]+))?$", raw, flags=re.IGNORECASE)
+    if not file_match:
+        file_match = re.search(r"ফাইল\s+বানাও\s+(.+?)(?:\s+লেখা:?\s+([\s\S]+))?$", raw, flags=re.IGNORECASE)
+    if file_match:
+        name = file_match.group(1).strip().strip("\"'")
+        content = (file_match.group(2) or "")[:20000]
+        if not name or name in {".", ".."} or "/" in name or "\\" in name or Path(name).name != name:
+            return {"ok": False, "handled": True, "action": "make_file", "response": "নিরাপত্তার জন্য শুধু একটি সাধারণ file name ব্যবহার করুন।"}
+        try:
+            desktop = Path.home() / "Desktop"
+            desktop.mkdir(parents=True, exist_ok=True)
+            target = desktop / name
+            if target.exists():
+                return {"ok": False, "handled": True, "action": "make_file", "response": "এই নামে file আগে থেকেই আছে; overwrite করা হয়নি।"}
+            target.write_text(content, encoding="utf-8")
+            return {"ok": True, "handled": True, "action": "make_file", "response": f"File created: {target}"}
+        except OSError:
+            return {"ok": False, "handled": True, "action": "make_file", "response": "Desktop-এ file তৈরি করা যায়নি।"}
+
     return {
         "ok": True, "handled": False,
         "response": "এই কমান্ডটি এখনো সমর্থিত নয়। সমর্থিত উদাহরণ: open YouTube/Google/Gmail, open Chrome/Edge/Firefox, open Notepad/Calculator/Downloads/Task Manager/VS Code, search for cats, PC status। নিরাপত্তার জন্য arbitrary terminal command চালানো হয় না।"
@@ -301,7 +359,7 @@ def local_ai_fallback(command: str) -> dict:
         '{"mode":"command","command":"one safe natural-language command"} only if the existing PC Agent can do it. '
         "Supported commands: open a normal HTTP(S) website, open YouTube, Google, Gmail, Facebook, GitHub, ChatGPT, "
         "Chrome, Edge, Firefox, Notepad, Calculator, Downloads, Task Manager, File Explorer, VS Code; "
-        "search the web; report basic PC status. "
+        "search the web; report basic PC status; list Desktop files; create a Desktop folder; create a non-overwriting text file on Desktop with optional content; report the current time. "
         "For unsupported or risky tasks, return an answer explaining the limitation. Never return shell commands, "
         "executable code, delete actions, purchases, message sending, or security changes. Never claim success. "
         "Match the user's language."
