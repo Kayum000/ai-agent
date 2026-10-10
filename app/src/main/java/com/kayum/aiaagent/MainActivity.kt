@@ -50,12 +50,15 @@ class MainActivity : Activity() {
  }
 
  private fun refreshStatus() {
-  val pc=prefs.getString("pc_url", "").orEmpty()
-  status.text = if (pc.isNotBlank())
-   "PC Agent: configured • Cloud AI: " + if (prefs.getString("gemini_key", "").orEmpty().isNotBlank()) "auto-fallback" else "not configured"
-  else if (prefs.getString("gemini_key", "").orEmpty().isNotBlank())
-   "Cloud AI: Gemini configured • " + "auto-fallback • PC Agent: not configured"
-  else "Cloud AI: add Gemini API key • PC Agent optional"
+  val pc=prefs.getString("pc_url", "").orEmpty().trim()
+  val token=prefs.getString("pc_token", "").orEmpty().trim()
+  val cloud=prefs.getString("gemini_key", "").orEmpty().isNotBlank()
+  status.text = when {
+   pc.isNotBlank() && token.isNotBlank() -> "PC Agent: configured • Cloud AI: " + if (cloud) "ready" else "add Gemini key"
+   pc.isNotBlank() -> "PC Agent URL saved • add token in Settings"
+   cloud -> "Cloud AI: Gemini ready • PC Agent optional"
+   else -> "Add Gemini key in Settings • PC Agent optional"
+  }
  }
 
  private fun send(fromVoice:Boolean) {
@@ -179,7 +182,12 @@ class MainActivity : Activity() {
  }
 
  private fun testPcAgent() {
-  val base=prefs.getString("pc_url", "").orEmpty().trim().ifBlank { "http://127.0.0.1:8765" }
+  val base=prefs.getString("pc_url", "").orEmpty().trim()
+  if (base.isBlank()) {
+   status.text = "PC Agent URL not configured"
+   Toast.makeText(this, "Settings-এ PC Agent URL দিন।", Toast.LENGTH_LONG).show()
+   return
+  }
   thread {
    try {
     val conn=URL(base.trimEnd('/') + "/health").openConnection() as HttpURLConnection
