@@ -144,6 +144,20 @@ def handle_command(command: str) -> dict:
         webbrowser.open(target)
         return {"ok": True, "handled": True, "action": "open_url", "response": f"Website opened: {target}"}
 
+    site_aliases = {
+        "youtube": "https://www.youtube.com",
+        "google": "https://www.google.com",
+        "gmail": "https://mail.google.com",
+        "facebook": "https://www.facebook.com",
+        "github": "https://github.com",
+        "chatgpt": "https://chatgpt.com",
+    }
+    if open_intent := any(w in low for w in ("open", "launch", "start", "খোলো", "খুলে দাও", "চালু", "ওপেন")):
+        for alias, target in site_aliases.items():
+            if alias in low:
+                webbrowser.open(target)
+                return {"ok": True, "handled": True, "action": "open_url", "response": f"{alias.title()} opened in the PC browser."}
+
     app_patterns = [
         (("calculator", "calc", "ক্যালকুলেটর"), "calculator"),
         (("notepad", "নোটপ্যাড", "text editor"), "notepad"),
