@@ -123,9 +123,9 @@ def open_app(name: str) -> tuple[bool, str]:
         if key in {"chrome", "google chrome"}:
             if system == "windows":
                 candidates = [
-                    os.path.expandvars(r"%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe"),
-                    os.path.expandvars(r"%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe"),
-                    os.path.expandvars(r"%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe"),
+                    os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                    os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                    os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
                 ]
                 exe = next((p for p in candidates if Path(p).exists()), None)
             elif system == "darwin":
@@ -141,8 +141,8 @@ def open_app(name: str) -> tuple[bool, str]:
         if key in {"edge", "microsoft edge"}:
             if system == "windows":
                 candidates = [
-                    os.path.expandvars(r"%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"),
-                    os.path.expandvars(r"%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe"),
+                    os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+                    os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
                 ]
                 exe = next((p for p in candidates if Path(p).exists()), None)
                 if exe:
@@ -197,7 +197,7 @@ def handle_command(command: str) -> dict:
     low = re.sub(r"^(?:pc\s*:\s*|পিসি\s*:\s*)", "", low).strip()
 
     # Open a user-supplied ordinary website URL only.
-    match = re.search(r"https?://[^\s<>\\"']+", raw, flags=re.IGNORECASE)
+    match = re.search(r"""https?://[^\s<>"']+""", raw, flags=re.IGNORECASE)
     open_words = ("open", "launch", "start", "go to", "visit", "browse", "খোলো", "খুলো", "খুলে দাও", "খুলুন", "চালু", "ওপেন", "যাও", "দেখাও", "ওয়েবসাইট", "ওয়েবসাইট")
     has_open_intent = any(w in low for w in open_words)
     if match and has_open_intent:
