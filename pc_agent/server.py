@@ -195,6 +195,9 @@ def handle_command(command: str) -> dict:
     low = re.sub(r"[!?।]+$", "", raw.lower()).strip()
     low = re.sub(r"^(?:siri[,: ]+|please\s+|দয়া করে\s+|দয়া করে\s+)", "", low).strip()
     low = re.sub(r"^(?:pc\s*:\s*|পিসি\s*:\s*)", "", low).strip()
+    # Users often append the target device, e.g. "Open YouTube My PC".
+    low = re.sub(r"\s+(?:on\s+)?(?:my\s+)?(?:pc|computer|desktop)\s*$", "", low).strip()
+    low = re.sub(r"\s+(?:আমার\s+)?(?:পিসি|কম্পিউটারে|কম্পিউটার)\s*$", "", low).strip()
 
     # Open a user-supplied ordinary website URL only.
     match = re.search(r"""https?://[^\s<>"']+""", raw, flags=re.IGNORECASE)
