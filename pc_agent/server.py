@@ -138,51 +138,71 @@ def open_app(name: str) -> tuple[bool, str]:
 
 
 def handle_command(command: str) -> dict:
+    """Parse a deliberately small, safe set of natural-language PC commands."""
     raw = command.strip()
     if not raw:
-        return {"ok": False, "handled": False, "response": "Empty command."}
-    low = raw.lower()
+        return {"ok": False, "handled": False, "response": "কমান্ড খালি। কী করতে হবে লিখুন বা বলুন।"}
 
-    # Only explicit HTTP(S) URLs are opened. No javascript:, file:, or shell URLs.
-    match = re.search(r"https?://[^\s<>\"']+", raw, flags=re.IGNORECASE)
-    if match and any(w in low for w in ("open", "visit", "go to", "website", "খুলো", "খুলে", "ওয়েবসাইট", "ওয়েবসাইট")):
+    # Normalize common voice-command wrappers without ever treating input as shell code.
+    low = re.sub(r"[!?।]+$", "", raw.lower()).strip()
+    low = re.sub(r"^(?:siri[,: ]+|please\s+|দয়া করে\s+|দয়া করে\s+)", "", low).strip()
+    low = re.sub(r"^(?:pc\s*:\s*|পিসি\s*:\s*)", "", low).strip()
+
+    # Open a user-supplied ordinary website URL only.
+    match = re.search(r"https?://[^\s<>\\"']+", raw, flags=re.IGNORECASE)
+    open_words = ("open", "launch", "start", "go to", "visit", "browse", "খোলো", "খুলো", "খুলে দাও", "খুলুন", "চালু", "ওপেন", "যাও", "দেখাও", "ওয়েবসাইট", "ওয়েবসাইট")
+    has_open_intent = any(w in low for w in open_words)
+    if match and has_open_intent:
         target = match.group(0).rstrip(".,)")
         parsed = urlparse(target)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-            return {"ok": False, "handled": True, "response": "For safety, only a normal http/https website URL can be opened."}
-        webbrowser.open(target)
-        return {"ok": True, "handled": True, "action": "open_url", "response": f"Website opened: {target}"}
+            return {"ok": False, "handled": True, "response": "নিরাপত্তার জন্য শুধু সাধারণ http/https ওয়েবসাইট খোলা যাবে।"}
+        try:
+            opened = webbrowser.open(target)
+            return {"ok": bool(opened), "handled": True, "action": "open_url",
+                    "response": f"Website open request sent: {target}" if opened else f"ব্রাউজার URL খুলতে পারেনি: {target}"}
+        except Exception as exc:
+            return {"ok": False, "handled": True, "response": f"ওয়েবসাইট খোলা যায়নি: {exc}"}
 
     site_aliases = {
         "youtube": "https://www.youtube.com",
+        "ইউটিউব": "https://www.youtube.com",
         "google": "https://www.google.com",
+        "গুগল": "https://www.google.com",
         "gmail": "https://mail.google.com",
         "facebook": "https://www.facebook.com",
+        "ফেসবুক": "https://www.facebook.com",
         "github": "https://github.com",
         "chatgpt": "https://chatgpt.com",
+        "গুগল ম্যাপ": "https://maps.google.com",
+        "google maps": "https://maps.google.com",
     }
-    if open_intent := any(w in low for w in ("open", "launch", "start", "খোলো", "খুলে দাও", "চালু", "ওপেন")):
+    if has_open_intent:
         for alias, target in site_aliases.items():
             if alias in low:
-                webbrowser.open(target)
-                return {"ok": True, "handled": True, "action": "open_url", "response": f"{alias.title()} opened in the PC browser."}
+                try:
+                    opened = webbrowser.open(target)
+                    return {"ok": bool(opened), "handled": True, "action": "open_url",
+                            "response": f"{alias.title()} open request sent." if opened else f"{alias.title()} খোলার জন্য PC browser পাওয়া যায়নি।"}
+                except Exception as exc:
+                    return {"ok": False, "handled": True, "response": f"{alias.title()} খোলা যায়নি: {exc}"}
 
-    app_patterns = [
-        (("calculator", "calc", "ক্যালকুলেটর"), "calculator"),
-        (("notepad", "নোটপ্যাড", "text editor"), "notepad"),
-        (("file explorer", "explorer", "file manager", "ফাইল ম্যানেজার"), "file explorer"),
-        (("vscode", "vs code", "visual studio code"), "vscode"),
-        (("chrome", "google chrome"), "chrome"),
-        (("browser", "ব্রাউজার"), "browser"),
-    ]
-    open_intent = any(w in low for w in ("open", "launch", "start", "খোলো", "খুলে দাও", "চালু", "ওপেন"))
-    if open_intent:
-        for words, app in app_patterns:
-            if any(w in low for w in words):
-                ok, response = open_app(app)
-                return {"ok": ok, "handled": True, "action": "open_app", "response": response}
+    # Search requests are limited to a normal browser search URL.
+    search_match = re.search(r"(?:search(?:\s+for)?|google|খুঁজো|সার্চ করো|সার্চ)\s+(.+)$", low)
+    if search_match:
+        from urllib.parse import quote_plus
+        query = search_match.group(1).strip()
+        if query:
+            target = "https://www.google.com/search?q=" + quote_plus(query)
+            try:
+                opened = webbrowser.open(target)
+                return {"ok": bool(opened), "handled": True, "action": "web_search",
+                        "response": f"Browser search opened for: {query}" if opened else "PC browser পাওয়া যায়নি; search খোলা যায়নি।"}
+            except Exception as exc:
+                return {"ok": False, "handled": True, "response": f"Search খোলা যায়নি: {exc}"}
 
-    if any(w in low for w in ("pc status", "system status", "computer info", "system info", "কম্পিউটারের অবস্থা", "পিসির অবস্থা", "সিস্টেম তথ্য")):
+    # System status is read-only.
+    if any(w in low for w in ("pc status", "system status", "computer info", "system info", "কম্পিউটারের অবস্থা", "পিসির অবস্থা", "সিস্টেম তথ্য", "পিসির তথ্য")):
         home = Path.home()
         usage = shutil.disk_usage(home)
         total_gb = round(usage.total / (1024 ** 3), 1)
@@ -192,9 +212,28 @@ def handle_command(command: str) -> dict:
             "response": f"PC online. OS: {platform.platform()}; device: {socket.gethostname()}; Python: {platform.python_version()}; disk free at home volume: {free_gb} GB / {total_gb} GB."
         }
 
+    # App actions are allow-listed; user input is never passed to a shell.
+    app_patterns = [
+        (("calculator", "calc", "ক্যালকুলেটর"), "calculator"),
+        (("notepad", "নোটপ্যাড", "text editor", "টেক্সট এডিটর"), "notepad"),
+        (("file explorer", "explorer", "file manager", "ফাইল ম্যানেজার", "my computer", "this pc", "আমার কম্পিউটার"), "file explorer"),
+        (("downloads", "download folder", "ডাউনলোড", "ডাউনলোড ফোল্ডার"), "downloads"),
+        (("task manager", "টাস্ক ম্যানেজার"), "task manager"),
+        (("vscode", "vs code", "visual studio code"), "vscode"),
+        (("chrome", "google chrome", "ক্রোম"), "chrome"),
+        (("edge", "microsoft edge"), "edge"),
+        (("firefox", "ফায়ারফক্স", "ফায়ারফক্স"), "firefox"),
+        (("browser", "web browser", "ব্রাউজার", "ইন্টারনেট"), "browser"),
+    ]
+    if has_open_intent:
+        for words, app in app_patterns:
+            if any(w in low for w in words):
+                ok, response = open_app(app)
+                return {"ok": ok, "handled": True, "action": "open_app", "response": response}
+
     return {
         "ok": True, "handled": False,
-        "response": "This PC agent only performs safe allow-listed actions (open a website, browser, Chrome, Notepad, Calculator, file manager, VS Code, or report basic system info). No command was executed."
+        "response": "এই কমান্ডটি এখনো সমর্থিত নয়। সমর্থিত উদাহরণ: open YouTube/Google/Gmail, open Chrome/Edge/Firefox, open Notepad/Calculator/Downloads/Task Manager/VS Code, search for cats, PC status। নিরাপত্তার জন্য arbitrary terminal command চালানো হয় না।"
     }
 
 
