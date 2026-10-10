@@ -22,6 +22,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 import re
 
+try:
+    from pc_agent.binary_signal_engine import ingest_collector_payload, generate_binary_signal
+except ModuleNotFoundError:  # Supports running `python pc_agent/server.py` directly.
+    from binary_signal_engine import ingest_collector_payload, generate_binary_signal
+
 APP_NAME = "My PC AI Agent"
 HOST = os.environ.get("PC_AGENT_HOST", "0.0.0.0")
 PORT = int(os.environ.get("PC_AGENT_PORT", "8765"))
@@ -203,12 +208,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path.rstrip("/") == "/health":
-            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "open_allowlisted_app", "system_info"]})
+            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "open_allowlisted_app", "system_info", "quotex_collector_ingest", "binary_signal_analysis"]})
         else:
             self._send(404, {"ok": False, "error": "not_found"})
 
     def do_POST(self) -> None:
-        if self.path.rstrip("/") != "/api/mobile/command":
+        path = urlparse(self.path).path.rstrip("/")
+        if path not in {"/api/mobile/command", "/api/collector/quotex", "/api/binary/signal"}:
             self._send(404, {"ok": False, "error": "not_found"})
             return
         supplied = self.headers.get("X-PC-Agent-Token", "")
@@ -219,12 +225,23 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = 0
-        if length < 1 or length > MAX_BODY:
+        max_body = 512 * 1024 if path != "/api/mobile/command" else MAX_BODY
+        if length < 1 or length > max_body:
             self._send(413, {"ok": False, "error": "invalid_body_size"})
             return
         try:
             body = json.loads(self.rfile.read(length).decode("utf-8"))
-            command = body.get("command", "") if isinstance(body, dict) else ""
+            if not isinstance(body, dict):
+                raise ValueError("JSON object required")
+            if path == "/api/collector/quotex":
+                result = ingest_collector_payload(body)
+                self._send(200 if result.get("ok") else 400, result)
+                return
+            if path == "/api/binary/signal":
+                result = generate_binary_signal(body)
+                self._send(200 if result.get("ok") else 400, result)
+                return
+            command = body.get("command", "")
             if not isinstance(command, str) or len(command) > 2000:
                 raise ValueError("command must be text up to 2000 characters")
             result = handle_command(command)
