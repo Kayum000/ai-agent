@@ -4,7 +4,7 @@
  android:layout_width="match_parent" android:layout_height="match_parent">
  <TextView android:text="🎙 Siri — My PC AI Agent" android:textColor="#FFFFFF" android:textSize="22sp"
   android:textStyle="bold" android:padding="8dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
- <TextView android:id="@+id/status" android:text="Cloud AI: not configured" android:textColor="#9CA3AF"
+ <TextView android:id="@+id/status" android:text="PC Agent: not configured" android:textColor="#9CA3AF"
   android:textSize="13sp" android:padding="4dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
  <ScrollView android:id="@+id/scroll" android:layout_weight="1" android:layout_width="match_parent" android:layout_height="0dp">
   <TextView android:id="@+id/chat" android:textColor="#FFFFFF" android:textSize="16sp" android:padding="10dp"
@@ -21,6 +21,5 @@
   <Button android:id="@+id/voice" android:text="🎤 Voice" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
   <Button android:id="@+id/settings" android:text="⚙ Settings" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
   <Button android:id="@+id/pcTest" android:text="🖥 PC Test" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
-  <Button android:id="@+id/screenshot" android:text="📷 Chart" android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
  </LinearLayout>
 </LinearLayout>
