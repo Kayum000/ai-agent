@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
- <string name="app_name">My PC AI Agent</string>
- <string name="accessibility_description">My PC AI Agent phone control service</string>
+ <string name="app_name">Siri</string>
+ <string name="accessibility_description">Siri phone control service</string>
 </resources>
