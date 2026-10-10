@@ -11,6 +11,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Check PC agent Python syntax
+        run: python -m py_compile pc_agent/server.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
