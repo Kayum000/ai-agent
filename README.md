@@ -7,7 +7,7 @@ Native Android + Windows/macOS/Linux companion. The Android app provides Bengali
 ## Android features
 
 - Bengali/English voice input through Android's system speech-recognition activity.
-- Text-to-speech replies; the app attempts to select an installed female-sounding voice, but available voices depend on the phone's TTS engine and installed language data.
+- Text-to-speech replies; Siri prioritizes an installed female-sounding Bengali voice, then an English female-sounding voice when available. Actual voices depend on the phone's TTS engine and installed language data.
 - Open supported phone apps and explicit HTTP(S) websites.
 - Optional PC connection with a configurable URL and secret token.
 - PC Test button to verify connectivity.
@@ -24,7 +24,7 @@ Requirements: Python 3.10 or newer; no third-party Python packages are needed fo
 5. Connect the phone and PC to the same trusted Wi-Fi network. In Siri Settings, enter `http://PC-LAN-IP:8765` and the token printed by the PC.
 6. Tap **PC Test**.
 
-The companion supports allow-listed actions only: open a normal HTTP(S) website, open a browser/Chrome/Notepad/Calculator/file manager/VS Code when available, and report basic system/disk information. Unsupported requests are not sent to a cloud model. The server deliberately does **not** execute arbitrary shell commands, scripts, or destructive operations.
+The companion supports allow-listed actions only: open normal HTTP(S) websites, open YouTube/Google/Gmail/Facebook/GitHub/ChatGPT, open Chrome/Edge/Firefox/Notepad/Calculator/Downloads/Task Manager/file manager/VS Code when available, search the web, and report basic system/disk information. You can prefix commands with `PC:` to explicitly target the computer, or `PHONE:` to target the Android phone. Bengali and English command variants are supported for common actions. Unsupported requests are not sent to a cloud model. The server deliberately does **not** execute arbitrary shell commands, scripts, or destructive operations.
 
 ## Network and privacy safety
 
