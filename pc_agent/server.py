@@ -210,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path.rstrip("/") == "/health":
-            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "open_allowlisted_app", "system_info", "quotex_collector_ingest", "binary_signal_analysis"]})
+            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "open_allowlisted_app", "system_info", "quotex_collector_ingest", "binary_signal_analysis", "screenshot_ocr_analysis"]})
         else:
             self._send(404, {"ok": False, "error": "not_found"})
 
@@ -241,6 +241,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/binary/signal":
                 result = generate_binary_signal(body)
+                self._send(200 if result.get("ok") else 400, result)
+                return
+            if path == "/api/screenshot/analyze":
+                result = analyze_screenshot(body)
                 self._send(200 if result.get("ok") else 400, result)
                 return
             command = body.get("command", "")
