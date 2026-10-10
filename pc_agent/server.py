@@ -298,7 +298,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self) -> None:
-        if self.path.rstrip("/") == "/health":
+        if urlparse(self.path).path.rstrip("/") == "/health":
+            supplied = self.headers.get("X-PC-Agent-Token", "")
+            if not hmac.compare_digest(supplied, TOKEN):
+                self._send(401, {"ok": False, "error": "unauthorized", "response": "PC Agent token is incorrect."})
+                return
             self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "web_search", "open_allowlisted_app", "open_downloads", "open_task_manager", "system_info", "quotex_collector_ingest", "binary_signal_analysis", "screenshot_ocr_analysis", "combined_live_screenshot_analysis"]})
         else:
             self._send(404, {"ok": False, "error": "not_found"})
