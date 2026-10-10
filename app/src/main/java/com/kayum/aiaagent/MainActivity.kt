@@ -19,14 +19,15 @@ class MainActivity : Activity() {
  private var tts: TextToSpeech? = null
  private var speakNext = false
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
- private val models = listOf("gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite")
- private val pcToken = "mmc-local-test-token"
+ private val models = listOf("gemini-2.5-flash-lite", "gemini-2.5-flash")
+ private val voiceRequestCode = 7301
 
  override fun onCreate(b: Bundle?) {
   super.onCreate(b); setContentView(R.layout.activity_main)
   chat=findViewById(R.id.chat); input=findViewById(R.id.input); status=findViewById(R.id.status)
   findViewById<Button>(R.id.send).setOnClickListener { send(false) }
-  findViewById<Button>(R.id.voice).setOnClickListener {\n   Toast.makeText(this, "Voice input is disabled in the Play Protect safe build.", Toast.LENGTH_SHORT).show()\n  }\n  findViewById<Button>(R.id.settings).setOnClickListener { settings() }
+  findViewById<Button>(R.id.voice).setOnClickListener { startVoiceInput() }
+  findViewById<Button>(R.id.settings).setOnClickListener { settings() }
   findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
   tts=TextToSpeech(this) { result ->
    if(result==TextToSpeech.SUCCESS) {
@@ -80,7 +81,10 @@ class MainActivity : Activity() {
    val result = sendPcCommandSync(prompt)
    if (result.startsWith("HTTP 200:")) {
     val body = result.removePrefix("HTTP 200: ")
-    return try { org.json.JSONObject(body).optString("response").ifBlank { body } } catch(_:Exception) { body }
+    try {
+     val json = org.json.JSONObject(body)
+     if (json.optBoolean("handled", false)) return json.optString("response").ifBlank { "PC task completed." }
+    } catch(_:Exception) { }
    }
   }
   return askGemini(prompt)
@@ -102,7 +106,7 @@ class MainActivity : Activity() {
    val conn=URL(base.trimEnd('/') + "/api/mobile/command").openConnection() as HttpURLConnection
    conn.requestMethod="POST"; conn.connectTimeout=10000; conn.readTimeout=90000
    conn.setRequestProperty("Content-Type","application/json")
-   conn.setRequestProperty("X-PC-Agent-Token", pcToken); conn.doOutput=true
+   conn.setRequestProperty("X-PC-Agent-Token", prefs.getString("pc_token", "").orEmpty()); conn.doOutput=true
    conn.outputStream.use { it.write(org.json.JSONObject().put("command",command).toString().toByteArray(Charsets.UTF_8)) }
    val code=conn.responseCode
    val stream=if(code in 200..299) conn.inputStream else conn.errorStream
@@ -144,6 +148,31 @@ class MainActivity : Activity() {
   return "Cloud AI সব configured model-এ কাজ করেনি। $lastError"
  }
 
+ private fun startVoiceInput() {
+  try {
+   val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+    putExtra(RecognizerIntent.EXTRA_PROMPT, "বাংলা বা English-এ বলুন")
+   }
+   startActivityForResult(intent, voiceRequestCode)
+  } catch (_: Exception) {
+   Toast.makeText(this, "এই ফোনে speech recognition পাওয়া যায়নি।", Toast.LENGTH_LONG).show()
+  }
+ }
+
+ @Deprecated("Deprecated by Android, kept for broad device compatibility")
+ override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+  super.onActivityResult(requestCode, resultCode, data)
+  if (requestCode == voiceRequestCode && resultCode == RESULT_OK) {
+   val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+   if (spoken.isNotBlank()) {
+    input.setText(spoken)
+    send(true)
+   }
+  }
+ }
+
  private fun testPcAgent() {
   val base=prefs.getString("pc_url", "").orEmpty().trim().ifBlank { "http://127.0.0.1:8765" }
   thread {
@@ -168,12 +197,17 @@ class MainActivity : Activity() {
    hint="Gemini API key"; inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
    setText(prefs.getString("gemini_key",""))
   }
-  val pc=EditText(this).apply { hint="PC Agent URL (optional)"; setText(prefs.getString("pc_url","").orEmpty().ifBlank { "http://127.0.0.1:8765" }) }
-  box.addView(key); box.addView(pc)
+  val pc=EditText(this).apply { hint="PC Agent URL (e.g. http://192.168.1.5:8765)"; setText(prefs.getString("pc_url","").orEmpty()) }
+  val token=EditText(this).apply {
+   hint="PC Agent token (from PC console)"
+   inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+   setText(prefs.getString("pc_token","").orEmpty())
+  }
+  box.addView(key); box.addView(pc); box.addView(token)
   AlertDialog.Builder(this).setTitle("AI Settings")
-   .setMessage("Gemini ফোনে সরাসরি কাজ করে। PC Agent optional—PC connected হলে command পাঠানো যাবে.")
+   .setMessage("Gemini ফোনে সরাসরি কাজ করে। PC Agent ব্যবহার করতে PC-তে server চালিয়ে URL ও token দিন। Token public share করবেন না.")
    .setView(box).setPositiveButton("Save") { _,_ ->
-    prefs.edit().putString("gemini_key",key.text.toString().trim()).putString("pc_url",pc.text.toString().trim()).apply(); refreshStatus()
+    prefs.edit().putString("gemini_key",key.text.toString().trim()).putString("pc_url",pc.text.toString().trim()).putString("pc_token",token.text.toString().trim()).apply(); refreshStatus()
    }.setNegativeButton("Cancel",null).show()
  }
 
