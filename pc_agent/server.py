@@ -73,64 +73,112 @@ TOKEN = load_token()
 
 
 def open_app(name: str) -> tuple[bool, str]:
+    """Launch only explicitly allow-listed desktop applications/folders."""
     system = platform.system().lower()
     key = name.lower().strip()
-    if key in {"browser", "web browser", "ব্রাউজার", "ইন্টারনেট"}:
-        return (webbrowser.open("https://www.google.com"), "Browser opened.")
-    if key in {"notepad", "text editor", "নোটপ্যাড"}:
-        commands = {
-            "windows": ["notepad.exe"],
-            "darwin": ["open", "-a", "TextEdit"],
-            "linux": ["gedit"],
-        }
-        cmd = commands.get(system)
-    elif key in {"calculator", "calc", "ক্যালকুলেটর"}:
-        commands = {
-            "windows": ["calc.exe"],
-            "darwin": ["open", "-a", "Calculator"],
-            "linux": ["gnome-calculator"],
-        }
-        cmd = commands.get(system)
-    elif key in {"file explorer", "explorer", "files", "ফাইল ম্যানেজার"}:
-        home = str(Path.home())
-        if system == "windows":
-            subprocess.Popen(["explorer.exe", home])
-        elif system == "darwin":
-            subprocess.Popen(["open", home])
-        else:
-            subprocess.Popen(["xdg-open", home])
-        return True, "File manager opened at your home folder."
-    elif key in {"vscode", "vs code", "visual studio code"}:
-        executable = shutil.which("code")
-        if not executable:
-            return False, "Visual Studio Code was not found on this PC."
-        subprocess.Popen([executable])
-        return True, "Visual Studio Code opened."
-    elif key in {"chrome", "google chrome"}:
-        if system == "windows":
-            candidates = [
-                os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
-                os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
-                os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
-            ]
-            exe = next((p for p in candidates if Path(p).exists()), None)
+    try:
+        if key in {"browser", "web browser", "ব্রাউজার", "ইন্টারনেট"}:
+            opened = webbrowser.open("https://www.google.com")
+            return bool(opened), "Browser opened." if opened else "No usable browser was found."
+        if key in {"file explorer", "explorer", "files", "ফাইল ম্যানেজার"}:
+            target = str(Path.home())
+            if system == "windows":
+                subprocess.Popen(["explorer.exe", target])
+            elif system == "darwin":
+                subprocess.Popen(["open", target])
+            else:
+                subprocess.Popen(["xdg-open", target])
+            return True, "File manager opened at your home folder."
+        if key in {"downloads", "download folder", "ডাউনলোড", "ডাউনলোড ফোল্ডার"}:
+            target = str(Path.home() / "Downloads")
+            if not Path(target).is_dir():
+                return False, "Downloads folder was not found."
+            if system == "windows":
+                subprocess.Popen(["explorer.exe", target])
+            elif system == "darwin":
+                subprocess.Popen(["open", target])
+            else:
+                subprocess.Popen(["xdg-open", target])
+            return True, "Downloads folder opened."
+        if key in {"task manager", "টাস্ক ম্যানেজার"}:
+            if system == "windows":
+                subprocess.Popen(["taskmgr.exe"])
+                return True, "Task Manager opened."
+            if system == "darwin":
+                subprocess.Popen(["open", "-a", "Activity Monitor"])
+                return True, "Activity Monitor opened."
+            exe = shutil.which("gnome-system-monitor") or shutil.which("xfce4-taskmanager")
+            if not exe:
+                return False, "No supported system monitor was found."
+            subprocess.Popen([exe])
+            return True, "System monitor opened."
+
+        if key in {"vscode", "vs code", "visual studio code"}:
+            executable = shutil.which("code")
+            if not executable:
+                return False, "Visual Studio Code was not found on this PC."
+            subprocess.Popen([executable])
+            return True, "Visual Studio Code opened."
+
+        if key in {"chrome", "google chrome"}:
+            if system == "windows":
+                candidates = [
+                    os.path.expandvars(r"%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe"),
+                    os.path.expandvars(r"%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe"),
+                    os.path.expandvars(r"%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe"),
+                ]
+                exe = next((p for p in candidates if Path(p).exists()), None)
+            elif system == "darwin":
+                subprocess.Popen(["open", "-a", "Google Chrome"])
+                return True, "Google Chrome opened."
+            else:
+                exe = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
             if exe:
                 subprocess.Popen([exe])
                 return True, "Google Chrome opened."
-        elif system == "darwin":
-            subprocess.Popen(["open", "-a", "Google Chrome"])
-            return True, "Google Chrome opened."
-        else:
-            exe = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
+            return False, "Google Chrome was not found; try 'open browser'."
+
+        if key in {"edge", "microsoft edge"}:
+            if system == "windows":
+                candidates = [
+                    os.path.expandvars(r"%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"),
+                    os.path.expandvars(r"%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe"),
+                ]
+                exe = next((p for p in candidates if Path(p).exists()), None)
+                if exe:
+                    subprocess.Popen([exe])
+                    return True, "Microsoft Edge opened."
+            elif system == "darwin":
+                subprocess.Popen(["open", "-a", "Microsoft Edge"])
+                return True, "Microsoft Edge opened."
+            else:
+                exe = shutil.which("microsoft-edge") or shutil.which("microsoft-edge-stable")
+                if exe:
+                    subprocess.Popen([exe])
+                    return True, "Microsoft Edge opened."
+            return False, "Microsoft Edge was not found on this PC."
+
+        if key in {"firefox", "ফায়ারফক্স", "ফায়ারফক্স"}:
+            if system == "darwin":
+                subprocess.Popen(["open", "-a", "Firefox"])
+                return True, "Firefox opened."
+            exe = shutil.which("firefox")
             if exe:
                 subprocess.Popen([exe])
-                return True, "Google Chrome/Chromium opened."
-        return False, "Google Chrome was not found; try 'open browser'."
-    else:
-        return False, "This app is not in the safe allow-list."
-    if not cmd:
-        return False, f"{name} is not supported on {platform.system()}."
-    try:
+                return True, "Firefox opened."
+            return False, "Firefox was not found on this PC."
+
+        command_map = {
+            "notepad": {"windows": ["notepad.exe"], "darwin": ["open", "-a", "TextEdit"], "linux": ["gedit"]},
+            "text editor": {"windows": ["notepad.exe"], "darwin": ["open", "-a", "TextEdit"], "linux": ["gedit"]},
+            "নোটপ্যাড": {"windows": ["notepad.exe"], "darwin": ["open", "-a", "TextEdit"], "linux": ["gedit"]},
+            "calculator": {"windows": ["calc.exe"], "darwin": ["open", "-a", "Calculator"], "linux": ["gnome-calculator"]},
+            "calc": {"windows": ["calc.exe"], "darwin": ["open", "-a", "Calculator"], "linux": ["gnome-calculator"]},
+            "ক্যালকুলেটর": {"windows": ["calc.exe"], "darwin": ["open", "-a", "Calculator"], "linux": ["gnome-calculator"]},
+        }
+        cmd = command_map.get(key, {}).get(system)
+        if not cmd:
+            return False, f"{name} is not supported on {platform.system()}."
         subprocess.Popen(cmd)
         return True, f"{name} opened."
     except (OSError, subprocess.SubprocessError) as exc:
