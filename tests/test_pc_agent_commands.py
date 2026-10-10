@@ -1,5 +1,7 @@
 import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from pc_agent.server import handle_command
@@ -58,6 +60,27 @@ class PcCommandTests(unittest.TestCase):
         result = local_ai_fallback("Explain something")
         self.assertTrue(result["handled"])
         self.assertEqual(result["response"], "Local answer")
+
+    def test_create_desktop_file_without_overwriting(self):
+        with TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            (home / "Desktop").mkdir()
+            with patch("pc_agent.server.Path.home", return_value=home):
+                result = handle_command("create file SiriTest.txt with content: Hello Siri")
+                self.assertTrue(result["ok"])
+                self.assertEqual((home / "Desktop" / "SiriTest.txt").read_text(encoding="utf-8"), "Hello Siri")
+                again = handle_command("create file SiriTest.txt with content: overwrite")
+                self.assertFalse(again["ok"])
+                self.assertEqual((home / "Desktop" / "SiriTest.txt").read_text(encoding="utf-8"), "Hello Siri")
+
+    def test_create_desktop_folder(self):
+        with TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            (home / "Desktop").mkdir()
+            with patch("pc_agent.server.Path.home", return_value=home):
+                result = handle_command("create folder Reports")
+                self.assertTrue(result["ok"])
+                self.assertTrue((home / "Desktop" / "Reports").is_dir())
 
 
 if __name__ == "__main__":
