@@ -2,13 +2,13 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
  android:orientation="vertical" android:background="#0B1020" android:padding="12dp"
  android:layout_width="match_parent" android:layout_height="match_parent">
- <TextView android:text="🤖 My PC AI Agent" android:textColor="#FFFFFF" android:textSize="22sp"
+ <TextView android:text="🎙 Siri — My PC AI Agent" android:textColor="#FFFFFF" android:textSize="22sp"
   android:textStyle="bold" android:padding="8dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
  <TextView android:id="@+id/status" android:text="Cloud AI: not configured" android:textColor="#9CA3AF"
   android:textSize="13sp" android:padding="4dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
  <ScrollView android:id="@+id/scroll" android:layout_weight="1" android:layout_width="match_parent" android:layout_height="0dp">
   <TextView android:id="@+id/chat" android:textColor="#FFFFFF" android:textSize="16sp" android:padding="10dp"
-   android:text="AI Agent ready. বাংলা বা English লিখুন।&#10;&#10;Chat + Voice + PC Agent ready. PC connected থাকলে PC command পাঠানো যাবে। Phone-এর সাধারণ app/website command-ও কাজ করবে।"
+   android:text="Hi, আমি Siri! বাংলা বা English-এ কথা বলুন বা লিখুন।&#10;&#10;আমি উত্তর মেয়েলি কণ্ঠে পড়ে শোনাব। PC Agent ও Phone command ready."
    android:layout_width="match_parent" android:layout_height="wrap_content"/>
  </ScrollView>
  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
