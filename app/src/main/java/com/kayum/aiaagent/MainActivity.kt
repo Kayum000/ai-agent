@@ -76,7 +76,7 @@ class MainActivity : Activity() {
  private fun handleAgentRequest(prompt:String):String {
   val pc = prefs.getString("pc_url", "").orEmpty().trim()
   val forcePhone = prompt.startsWith("PHONE:", true) || prompt.startsWith("ফোনে")
-  val forcePc = prompt.startsWith("PC:", true) || prompt.startsWith("পিসিতে") || prompt.startsWith("কম্পিউটারে") || Regex("""(?i)\\b(?:my\\s+pc|on\\s+my\\s+pc|computer|desktop)\\s*[.!?।]*$""").containsMatchIn(prompt.trim()) || Regex("""(?:আমার\\s+)?(?:পিসিতে|কম্পিউটারে|কম্পিউটার)\\s*[.!?।]*$""").containsMatchIn(prompt.trim())
+  val forcePc = prompt.startsWith("PC:", true) || prompt.startsWith("পিসিতে") || prompt.startsWith("কম্পিউটারে") || Regex("""(?i)\b(?:my\s+pc|on\s+my\s+pc|computer|desktop)\s*[.!?।]*$""").containsMatchIn(prompt.trim()) || Regex("""(?:আমার\s+)?(?:পিসিতে|কম্পিউটারে|কম্পিউটার)\s*[.!?।]*$""").containsMatchIn(prompt.trim())
   val phonePrompt = prompt.replaceFirst(Regex("^(?i:PHONE:|ফোনে)\\s*"), "").trim()
   val pcPrompt = prompt.replaceFirst(Regex("^(?i:PC:|পিসিতে|কম্পিউটারে)\\s*"), "").trim()
   if (forcePhone) {
