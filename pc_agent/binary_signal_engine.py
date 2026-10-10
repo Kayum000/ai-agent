@@ -69,6 +69,10 @@ def _rsi(values, period=14):
     return 100 - 100 / (1 + gain / loss)
 
 
+def _asset_key(value):
+    return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
+
+
 def _direction(value):
     s = str(value or "").strip().upper()
     if s in {"CALL", "UP", "BUY", "BULLISH", "RISE"}: return "CALL"
@@ -130,7 +134,13 @@ def latest_collector_payload(asset=None):
     with _LOCK:
         if asset:
             key = str(asset).strip()
-            snap, stamp = _LATEST.get(key), _LATEST_AT.get(key, 0.0)
+            exact = _LATEST.get(key)
+            if exact and time.time() - _LATEST_AT.get(key, 0.0) <= MAX_AGE:
+                return dict(exact)
+            normalized = _asset_key(key)
+            match = next((name for name in _LATEST if _asset_key(name) == normalized), None)
+            snap = _LATEST.get(match) if match else None
+            stamp = _LATEST_AT.get(match, 0.0) if match else 0.0
             return dict(snap) if snap and time.time() - stamp <= MAX_AGE else None
         fresh = [(stamp, _LATEST[key]) for key, stamp in _LATEST_AT.items() if time.time() - stamp <= MAX_AGE]
         return dict(max(fresh, key=lambda item: item[0])[1]) if fresh else None
@@ -196,7 +206,7 @@ def generate_binary_signal(payload):
     screenshot_note = None
     if isinstance(screenshot, dict):
         sa = str(screenshot.get("asset") or "").strip()
-        if sa and asset and sa.casefold() != asset.casefold():
+        if sa and asset and _asset_key(sa) != _asset_key(asset):
             return {"ok": True, "action": "NO TRADE", "asset": asset, "reason": "Screenshot/live asset mismatch", "source": "live_collector+screenshot"}
         st = _ts(screenshot.get("observed_at"))
         if st is not None and abs(now-st) > MAX_AGE:

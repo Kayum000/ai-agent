@@ -26,11 +26,13 @@ Screenshot observation shape:
 {"asset":"EURUSD_otc","screenshot_analysis":{"asset":"EURUSD_otc","direction":"CALL","confidence":0.7,"observed_at":1790000000}}
 ```
 
-**Screenshot limitation:** this endpoint consumes structured observations from a
-vision analyzer; it does not decode raw screenshot pixels by itself. An Android
-screenshot picker + vision-model call must be connected before raw screenshots
-automatically become observations. A screenshot/live asset mismatch or conflict
-returns `NO TRADE`.
+The Android app includes a **Chart** button: it lets the user select a chart
+screenshot, asks the configured Gemini vision model for a structured observation,
+then sends that observation to the PC Agent. The engine compares it with the
+fresh Collector stream; an asset mismatch or conflicting direction returns
+`NO TRADE`. Screenshot analysis requires a configured Gemini API key and a
+connected PC Agent. A screenshot by itself cannot replace the minimum closed-candle
+history required by the live signal engine.
 
 ## Research safeguards
 
