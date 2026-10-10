@@ -26,13 +26,7 @@ Screenshot observation shape:
 {"asset":"EURUSD_otc","screenshot_analysis":{"asset":"EURUSD_otc","direction":"CALL","confidence":0.7,"observed_at":1790000000}}
 ```
 
-The Android app includes a **Chart** button: it lets the user select a chart
-screenshot, asks the configured Gemini vision model for a structured observation,
-then sends that observation to the PC Agent. The engine compares it with the
-fresh Collector stream; an asset mismatch or conflicting direction returns
-`NO TRADE`. Screenshot analysis requires a configured Gemini API key and a
-connected PC Agent. A screenshot by itself cannot replace the minimum closed-candle
-history required by the live signal engine.
+The Android app includes a **Chart** button and sends the selected screenshot to the PC Agent for local OCR. OCR reads visible text only; it does not understand candle patterns or infer direction from chart pixels. The engine compares any unambiguous visible label with the fresh Collector stream; an asset mismatch or conflicting direction returns `NO TRADE`. Screenshot OCR requires Pillow, pytesseract, and the Tesseract executable on the PC. A screenshot by itself cannot replace the minimum closed-candle history required by the live signal engine. No hosted vision service or API key is used.
 
 ## Research safeguards
 
