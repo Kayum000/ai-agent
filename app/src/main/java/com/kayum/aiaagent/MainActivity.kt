@@ -31,19 +31,28 @@ class MainActivity : Activity() {
   findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
   tts=TextToSpeech(this) { result ->
    if(result==TextToSpeech.SUCCESS) {
-    val engine=tts
-    val female=engine?.voices?.filter { v ->
-     val n=v.name.lowercase(); val l=v.locale.language.lowercase()
-     (n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")) && l in setOf("bn","en","hi")
-    }?.firstOrNull() ?: engine?.voices?.firstOrNull { v ->
+    val engine=tts ?: return@TextToSpeech
+    // Set the target language first: setLanguage can reset the active voice.
+    val bn=engine.setLanguage(Locale.forLanguageTag("bn-BD"))
+    val wantedLanguage = if(bn==TextToSpeech.LANG_MISSING_DATA || bn==TextToSpeech.LANG_NOT_SUPPORTED) {
+     engine.setLanguage(Locale.US)
+     "en"
+    } else "bn"
+    val voices = engine.voices.orEmpty()
+    fun soundsFemale(v: android.speech.tts.Voice): Boolean {
      val n=v.name.lowercase()
-     n.contains("female") || n.contains("woman") || n.contains("fem") || n.contains("sfg")
+     return n.contains("female") || n.contains("woman") || n.contains("fem") ||
+      n.contains("sfg") || n.contains("zira") || n.contains("jenny") ||
+      n.contains("aria") || n.contains("samantha") || n.contains("victoria")
     }
-    if(female!=null) engine?.voice=female
-    val bn=engine?.setLanguage(Locale.forLanguageTag("bn-BD")) ?: TextToSpeech.ERROR
-    if(bn==TextToSpeech.LANG_MISSING_DATA || bn==TextToSpeech.LANG_NOT_SUPPORTED) engine?.setLanguage(Locale.US)
-    engine?.setPitch(1.12f)
-    engine?.setSpeechRate(0.96f)
+    val preferred = voices.firstOrNull { it.locale.language.equals(wantedLanguage,true) && soundsFemale(it) }
+     ?: voices.firstOrNull { it.locale.language.equals(wantedLanguage,true) }
+     ?: voices.firstOrNull { soundsFemale(it) }
+    if(preferred!=null) engine.voice=preferred
+    engine.setPitch(1.12f)
+    engine.setSpeechRate(0.96f)
+   } else {
+    runOnUiThread { status.text = "Siri voice unavailable • check phone Text-to-Speech settings" }
    }
   }
   refreshStatus()
@@ -76,8 +85,25 @@ class MainActivity : Activity() {
 
  private fun handleAgentRequest(prompt:String):String {
   val pc = prefs.getString("pc_url", "").orEmpty().trim()
-  if (pc.isNotBlank()) {
-   val command = prompt.removePrefix("PC:").removePrefix("pc:").trim()
+  val forcePhone = prompt.startsWith("PHONE:", true) || prompt.startsWith("ফোনে")
+  val forcePc = prompt.startsWith("PC:", true) || prompt.startsWith("পিসিতে") || prompt.startsWith("কম্পিউটারে")
+  val phonePrompt = prompt.replaceFirst(Regex("^(?i:PHONE:|ফোনে)\\s*"), "").trim()
+  val pcPrompt = prompt.replaceFirst(Regex("^(?i:PC:|পিসিতে|কম্পিউটারে)\\s*"), "").trim()
+  if (forcePhone) {
+   return PhoneAgent.handle(this, phonePrompt) ?: "এই phone command এখনো সমর্থিত নয়।"
+  }
+  // Keep phone-only app actions working even when a PC URL is configured.
+  val low = prompt.lowercase()
+  val phoneOnlyIntent = listOf("whatsapp", "telegram", "facebook", "play store", "সেটিংস", "ফোনে").any { low.contains(it) }
+  if (!forcePc && phoneOnlyIntent) {
+   val phone = PhoneAgent.handle(this, prompt)
+   if (phone != null) return phone
+  }
+  if (pc.isNotBlank() || forcePc) {
+   if (pc.isBlank()) return "PC Agent URL সেটিংসে দিন।"
+   val command = pcPrompt
+   val token = prefs.getString("pc_token", "").orEmpty().trim()
+   if (token.isBlank()) return "PC Agent token নেই। Settings-এ token দিন।"
    val result = sendPcCommandSync(command)
    if (result.startsWith("HTTP 200:")) {
     val body = result.removePrefix("HTTP 200: ")
@@ -85,7 +111,6 @@ class MainActivity : Activity() {
      val json = org.json.JSONObject(body)
      val message = json.optString("response").trim()
      if (json.optBoolean("handled", false)) return message.ifBlank { "PC task completed." }
-     // Keep the PC agent's real explanation instead of hiding it behind a generic error.
      if (message.isNotBlank()) return message
      return "PC Agent command বুঝেছে, কিন্তু কোনো action সম্পন্ন করেনি।"
     } catch(_:Exception) {
@@ -97,11 +122,13 @@ class MainActivity : Activity() {
     return "PC Agent endpoint পাওয়া যায়নি। Settings-এ PC Agent URL পরীক্ষা করুন।"
    } else if (result.startsWith("PC Agent error:")) {
     return "PC Agent-এ সংযোগ হচ্ছে না। PC-তে server চালু আছে কি না, Wi-Fi একই network-এ কি না, এবং URL/token ঠিক আছে কি না পরীক্ষা করুন। বিস্তারিত: " + result.removePrefix("PC Agent error:").trim()
+   } else {
+    return "PC Agent-এর অপ্রত্যাশিত response: " + result
    }
   }
   val phone = PhoneAgent.handle(this, prompt)
-  if (phone != null && !phone.startsWith("Phone Control চালু নেই")) return phone
-  return "এই অনুরোধটি চালাতে PC Agent-এর সমর্থিত command দরকার।"
+  if (phone != null) return phone
+  return "এই কমান্ডটি সমর্থিত নয়। PC-তে চালাতে 'PC: open Chrome' লিখুন, আর ফোনে চালাতে 'PHONE: open WhatsApp' লিখুন।"
  }
 
  private fun speak(text:String) {
