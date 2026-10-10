@@ -3,15 +3,11 @@ package com.kayum.aiaagent
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
-import android.util.Base64
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.widget.*
-import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -24,9 +20,7 @@ class MainActivity : Activity() {
  private var tts: TextToSpeech? = null
  private var speakNext = false
  private val prefs by lazy { getSharedPreferences("agent", MODE_PRIVATE) }
- private val models = listOf("gemini-2.5-flash-lite", "gemini-2.5-flash")
  private val voiceRequestCode = 7301
- private val screenshotRequestCode = 7302
 
  override fun onCreate(b: Bundle?) {
   super.onCreate(b); setContentView(R.layout.activity_main)
@@ -35,7 +29,6 @@ class MainActivity : Activity() {
   findViewById<Button>(R.id.voice).setOnClickListener { startVoiceInput() }
   findViewById<Button>(R.id.settings).setOnClickListener { settings() }
   findViewById<Button>(R.id.pcTest).setOnClickListener { testPcAgent() }
-  findViewById<Button>(R.id.screenshot).setOnClickListener { startScreenshotPicker() }
   tts=TextToSpeech(this) { result ->
    if(result==TextToSpeech.SUCCESS) {
     val engine=tts
@@ -59,12 +52,10 @@ class MainActivity : Activity() {
  private fun refreshStatus() {
   val pc=prefs.getString("pc_url", "").orEmpty().trim()
   val token=prefs.getString("pc_token", "").orEmpty().trim()
-  val cloud=prefs.getString("gemini_key", "").orEmpty().isNotBlank()
   status.text = when {
-   pc.isNotBlank() && token.isNotBlank() -> "PC Agent: configured • Cloud AI: " + if (cloud) "ready" else "add Gemini key"
+   pc.isNotBlank() && token.isNotBlank() -> "PC Agent: configured"
    pc.isNotBlank() -> "PC Agent URL saved • add token in Settings"
-   cloud -> "Cloud AI: Gemini ready • PC Agent optional"
-   else -> "Add Gemini key in Settings • PC Agent optional"
+   else -> "Configure PC Agent in Settings"
   }
  }
 
@@ -102,7 +93,7 @@ class MainActivity : Activity() {
   }
   val phone = PhoneAgent.handle(this, prompt)
   if (phone != null && !phone.startsWith("Phone Control চালু নেই")) return phone
-  return askGemini(prompt)
+  return "এই অনুরোধটি চালাতে PC Agent-এর সমর্থিত command দরকার।"
  }
 
  private fun speak(text:String) {
@@ -129,40 +120,6 @@ class MainActivity : Activity() {
   } catch(e:Exception) { "PC Agent error: " + (e.message ?: "unknown error") }
  }
 
- private fun askGemini(prompt:String):String {
-  val key=prefs.getString("gemini_key","").orEmpty()
-  if(key.isBlank()) return "Gemini key সেট করা নেই। ⚙ Settings খুলে আপনার নিজের API key দিন।"
-  var lastError = ""
-  for (model in models) {
-   try {
-    val url=URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent")
-    val conn=url.openConnection() as HttpURLConnection
-    conn.requestMethod="POST"; conn.connectTimeout=20000; conn.readTimeout=60000
-    conn.setRequestProperty("Content-Type","application/json"); conn.setRequestProperty("x-goog-api-key",key); conn.doOutput=true
-    val body=org.json.JSONObject().put("contents", org.json.JSONArray().put(
-     org.json.JSONObject().put("parts", org.json.JSONArray().put(org.json.JSONObject().put("text",
-      "Your name is Siri. You are a friendly female-voiced personal assistant in a phone app. Answer naturally and clearly in Bengali or English matching the user. Keep spoken answers concise. Never claim you performed a phone or PC action unless the app has confirmed it succeeded. If an action was not executed, explain that honestly. User request: " + prompt
-     )))
-    )).toString()
-    conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-    val code=conn.responseCode
-    val stream=if(code in 200..299) conn.inputStream else conn.errorStream
-    val text=stream?.bufferedReader()?.use { it.readText() } ?: ""
-    if(code in 200..299) {
-     return org.json.JSONObject(text).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")
-      ?.optJSONArray("parts")?.optJSONObject(0)?.optString("text")
-      ?.takeIf { it.isNotBlank() } ?: "AI কোনো text response দেয়নি।"
-    }
-    lastError = "model=$model HTTP $code " + runCatching {
-     org.json.JSONObject(text).optJSONObject("error")?.optString("message")
-    }.getOrNull().orEmpty()
-   } catch(e:Exception) {
-    lastError = "model=$model " + (e.message ?: "unknown error")
-   }
-  }
-  return "Cloud AI সব configured model-এ কাজ করেনি। $lastError"
- }
-
  private fun startVoiceInput() {
   try {
    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -179,10 +136,6 @@ class MainActivity : Activity() {
  @Deprecated("Deprecated by Android, kept for broad device compatibility")
  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
   super.onActivityResult(requestCode, resultCode, data)
-  if (requestCode == screenshotRequestCode && resultCode == RESULT_OK) {
-   data?.data?.let { analyzeChartScreenshot(it) }
-   return
-  }
   if (requestCode == voiceRequestCode && resultCode == RESULT_OK) {
    val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
    if (spoken.isNotBlank()) {
@@ -190,104 +143,6 @@ class MainActivity : Activity() {
     send(true)
    }
   }
- }
-
- private fun startScreenshotPicker() {
-  try {
-   val intent = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }
-   startActivityForResult(Intent.createChooser(intent, "Quotex chart screenshot নির্বাচন করুন"), screenshotRequestCode)
-  } catch (_: Exception) {
-   Toast.makeText(this, "ছবি নির্বাচন করা যায়নি।", Toast.LENGTH_LONG).show()
-  }
- }
-
- private fun analyzeChartScreenshot(uri: Uri) {
-  val key = prefs.getString("gemini_key", "").orEmpty().trim()
-  if (key.isBlank()) {
-   Toast.makeText(this, "আগে Settings-এ Gemini API key দিন।", Toast.LENGTH_LONG).show()
-   return
-  }
-  chat.append("\n\nScreenshot: chart বিশ্লেষণ হচ্ছে…")
-  thread {
-   try {
-    val original = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-     ?: throw IllegalArgumentException("ছবিটি পড়া যায়নি")
-    val scale = minOf(1.0, 1200.0 / maxOf(original.width, original.height))
-    val bitmap = if (scale < 1.0) Bitmap.createScaledBitmap(
-     original, (original.width * scale).toInt().coerceAtLeast(1),
-     (original.height * scale).toInt().coerceAtLeast(1), true
-    ) else original
-    val bytes = ByteArrayOutputStream()
-    bitmap.compress(Bitmap.CompressFormat.JPEG, 82, bytes)
-    if (bitmap !== original) bitmap.recycle()
-    original.recycle()
-    val encoded = Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP)
-    val analysis = askGeminiVision(encoded)
-     ?: throw IllegalStateException("Vision model থেকে valid JSON পাওয়া যায়নি")
-    analysis.put("observed_at", System.currentTimeMillis() / 1000)
-    val result = sendBinarySignal(analysis)
-    runOnUiThread {
-     chat.append("\nScreenshot + Binary Signal:\n" + result)
-     status.text = "Chart analysis complete • signal-only"
-     findViewById<ScrollView>(R.id.scroll).post { findViewById<ScrollView>(R.id.scroll).fullScroll(ScrollView.FOCUS_DOWN) }
-    }
-   } catch (e: Exception) {
-    runOnUiThread { chat.append("\nScreenshot analysis failed: " + (e.message ?: "unknown error")) }
-   }
-  }
- }
-
- private fun askGeminiVision(encodedImage: String): org.json.JSONObject? {
-  val key = prefs.getString("gemini_key", "").orEmpty().trim()
-  val prompt = """Analyze this binary-options market chart screenshot visually. Do not predict with certainty.
-Return ONLY JSON with keys: asset (visible symbol or empty string), direction (CALL, PUT, or UNKNOWN),
-confidence (0.0 to 1.0 for your visual interpretation only), timeframe (visible timeframe or UNKNOWN),
-visible_price (number or null), chart_observations (short string), uncertainty (short string).
-Use UNKNOWN and low confidence if the chart/symbol is unclear. Do not invent hidden OHLC values or claim win probability."""
-  for (model in models) {
-   try {
-    val parts = org.json.JSONArray()
-     .put(org.json.JSONObject().put("text", prompt))
-     .put(org.json.JSONObject().put("inline_data",
-      org.json.JSONObject().put("mime_type", "image/jpeg").put("data", encodedImage)))
-    val requestBody = org.json.JSONObject()
-     .put("contents", org.json.JSONArray().put(org.json.JSONObject().put("parts", parts)))
-     .put("generationConfig", org.json.JSONObject().put("temperature", 0.1).put("responseMimeType", "application/json"))
-    val conn = URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent").openConnection() as HttpURLConnection
-    conn.requestMethod = "POST"; conn.connectTimeout = 20000; conn.readTimeout = 60000
-    conn.setRequestProperty("Content-Type", "application/json")
-    conn.setRequestProperty("x-goog-api-key", key); conn.doOutput = true
-    conn.outputStream.use { it.write(requestBody.toString().toByteArray(Charsets.UTF_8)) }
-    val code = conn.responseCode
-    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-    val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-    if (code !in 200..299) continue
-    val answer = org.json.JSONObject(text).optJSONArray("candidates")?.optJSONObject(0)
-     ?.optJSONObject("content")?.optJSONArray("parts")?.optJSONObject(0)?.optString("text").orEmpty()
-    val first = answer.indexOf('{'); val last = answer.lastIndexOf('}')
-    if (first >= 0 && last > first) return org.json.JSONObject(answer.substring(first, last + 1))
-   } catch (_: Exception) { }
-  }
-  return null
- }
-
- private fun sendBinarySignal(analysis: org.json.JSONObject): String {
-  val base = prefs.getString("pc_url", "").orEmpty().trim()
-  val token = prefs.getString("pc_token", "").orEmpty().trim()
-  if (base.isBlank() || token.isBlank()) return "PC Agent URL/token সেট করা নেই। Settings-এ সংযোগ দিন।\nScreenshot observation: " + analysis.toString(2)
-  val payload = org.json.JSONObject().put("screenshot_analysis", analysis)
-  val asset = analysis.optString("asset", "").trim()
-  if (asset.isNotBlank() && !asset.equals("UNKNOWN", true)) payload.put("asset", asset)
-  val conn = URL(base.trimEnd('/') + "/api/binary/signal").openConnection() as HttpURLConnection
-  conn.requestMethod = "POST"; conn.connectTimeout = 10000; conn.readTimeout = 20000
-  conn.setRequestProperty("Content-Type", "application/json")
-  conn.setRequestProperty("X-PC-Agent-Token", token); conn.doOutput = true
-  conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-  val code = conn.responseCode
-  val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-  val response = stream?.bufferedReader()?.use { it.readText() } ?: ""
-  return if (code in 200..299) runCatching { org.json.JSONObject(response).toString(2) }.getOrDefault(response)
-   else "PC Agent HTTP " + code + ": " + response
  }
 
  private fun testPcAgent() {
@@ -315,21 +170,17 @@ Use UNKNOWN and low confidence if the chart/symbol is unclear. Do not invent hid
 
  private fun settings() {
   val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(40,10,40,10) }
-  val key=EditText(this).apply {
-   hint="Gemini API key"; inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-   setText(prefs.getString("gemini_key",""))
-  }
   val pc=EditText(this).apply { hint="PC Agent URL (e.g. http://192.168.1.5:8765)"; setText(prefs.getString("pc_url","").orEmpty()) }
   val token=EditText(this).apply {
    hint="PC Agent token (from PC console)"
    inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
    setText(prefs.getString("pc_token","").orEmpty())
   }
-  box.addView(key); box.addView(pc); box.addView(token)
-  AlertDialog.Builder(this).setTitle("AI Settings")
-   .setMessage("Gemini ফোনে সরাসরি কাজ করে। PC Agent ব্যবহার করতে PC-তে server চালিয়ে URL ও token দিন। Token public share করবেন না.")
+  box.addView(pc); box.addView(token)
+  AlertDialog.Builder(this).setTitle("Siri Settings")
+   .setMessage("PC Agent ব্যবহার করতে PC-তে server চালিয়ে URL ও token দিন। Token public share করবেন না.")
    .setView(box).setPositiveButton("Save") { _,_ ->
-    prefs.edit().putString("gemini_key",key.text.toString().trim()).putString("pc_url",pc.text.toString().trim()).putString("pc_token",token.text.toString().trim()).apply(); refreshStatus()
+    prefs.edit().clear().putString("pc_url",pc.text.toString().trim()).putString("pc_token",token.text.toString().trim()).apply(); refreshStatus()
    }.setNegativeButton("Cancel",null).show()
  }
 
