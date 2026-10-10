@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import patch
 
@@ -46,6 +47,17 @@ class PcCommandTests(unittest.TestCase):
         result = handle_command("   ")
         self.assertFalse(result["handled"])
         self.assertIn("খালি", result["response"])
+
+    @patch("pc_agent.server.urllib.request.urlopen")
+    def test_local_ai_fallback_returns_general_answer(self, mocked_urlopen):
+        response = mocked_urlopen.return_value.__enter__.return_value
+        response.read.return_value = json.dumps({
+            "message": {"content": json.dumps({"mode": "answer", "answer": "Local answer"})}
+        }).encode("utf-8")
+        from pc_agent.server import local_ai_fallback
+        result = local_ai_fallback("Explain something")
+        self.assertTrue(result["handled"])
+        self.assertEqual(result["response"], "Local answer")
 
 
 if __name__ == "__main__":
