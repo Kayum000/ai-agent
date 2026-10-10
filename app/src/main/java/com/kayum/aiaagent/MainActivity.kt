@@ -200,8 +200,14 @@ class MainActivity : Activity() {
   }
   thread {
    try {
+    val token=prefs.getString("pc_token", "").orEmpty().trim()
+    if (token.isBlank()) {
+     runOnUiThread { status.text = "PC Agent: token missing"; chat.append("\n\nPC Test: FAILED\nSettings-এ PC Agent token দিন।") }
+     return@thread
+    }
     val conn=URL(base.trimEnd('/') + "/health").openConnection() as HttpURLConnection
     conn.requestMethod="GET"; conn.connectTimeout=5000; conn.readTimeout=5000
+    conn.setRequestProperty("X-PC-Agent-Token", token)
     val code=conn.responseCode
     val body=(if(code in 200..299) conn.inputStream else conn.errorStream).bufferedReader().use { it.readText() }
     runOnUiThread {
