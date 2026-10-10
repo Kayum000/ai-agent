@@ -16,6 +16,7 @@ import socket
 import subprocess
 import sys
 import threading
+import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -288,6 +289,49 @@ def handle_command(command: str) -> dict:
     }
 
 
+def local_ai_fallback(command: str) -> dict:
+    """Use the PC's local Ollama model for general chat; never execute arbitrary code."""
+    endpoint = os.environ.get("PC_AGENT_OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
+    model = os.environ.get("PC_AGENT_LOCAL_MODEL", "qwen2.5:3b")
+    system = (
+        "You are Siri, a Bengali/English general assistant running locally on the user's PC. "
+        "Return JSON only. For questions, writing, translation, explanation, planning, or coding help, "
+        '{"mode":"answer","answer":"..."} with a useful answer. '
+        "For an explicit PC task, return "
+        '{"mode":"command","command":"one safe natural-language command"} only if the existing PC Agent can do it. '
+        "Supported commands: open a normal HTTP(S) website, open YouTube, Google, Gmail, Facebook, GitHub, ChatGPT, "
+        "Chrome, Edge, Firefox, Notepad, Calculator, Downloads, Task Manager, File Explorer, VS Code; "
+        "search the web; report basic PC status. "
+        "For unsupported or risky tasks, return an answer explaining the limitation. Never return shell commands, "
+        "executable code, delete actions, purchases, message sending, or security changes. Never claim success. "
+        "Match the user's language."
+    )
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": command}],
+        "format": "json", "stream": False, "options": {"temperature": 0.1}
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(endpoint, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=150) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        plan = json.loads(data["message"]["content"])
+        if plan.get("mode") == "command" and isinstance(plan.get("command"), str):
+            normalized = plan["command"].strip()[:2000]
+            if normalized and normalized.lower() != command.strip().lower():
+                result = handle_command(normalized)
+                if result.get("handled"):
+                    return result
+            return {"ok": False, "handled": True, "action": "local_ai",
+                    "response": "এই কাজটি বর্তমান নিরাপদ PC tool দিয়ে করা যাচ্ছে না।"}
+        if plan.get("mode") == "answer" and isinstance(plan.get("answer"), str):
+            return {"ok": True, "handled": True, "action": "local_ai", "response": plan["answer"][:12000]}
+    except Exception:
+        return {"ok": False, "handled": True, "action": "local_ai",
+                "response": "Local AI-তে সংযোগ হয়নি। PC-তে Ollama চালু আছে কি না পরীক্ষা করুন।"}
+    return {"ok": False, "handled": True, "action": "local_ai", "response": "AI response format বোঝা যায়নি।"}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "MyPCAgent/1.0"
 
@@ -306,7 +350,7 @@ class Handler(BaseHTTPRequestHandler):
             if not hmac.compare_digest(supplied, TOKEN):
                 self._send(401, {"ok": False, "error": "unauthorized", "response": "PC Agent token is incorrect."})
                 return
-            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "web_search", "open_allowlisted_app", "open_downloads", "open_task_manager", "system_info", "quotex_collector_ingest", "binary_signal_analysis", "screenshot_ocr_analysis", "combined_live_screenshot_analysis"]})
+            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "web_search", "open_allowlisted_app", "open_downloads", "open_task_manager", "system_info", "quotex_collector_ingest", "binary_signal_analysis", "screenshot_ocr_analysis", "combined_live_screenshot_analysis", "local_ollama_ai"]})
         else:
             self._send(404, {"ok": False, "error": "not_found"})
 
@@ -351,6 +395,8 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(command, str) or len(command) > 2000:
                 raise ValueError("command must be text up to 2000 characters")
             result = handle_command(command)
+            if not result.get("handled"):
+                result = local_ai_fallback(command)
             self._send(200, result)
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             self._send(400, {"ok": False, "handled": False, "error": str(exc)})
