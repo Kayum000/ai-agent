@@ -78,7 +78,7 @@ class MainActivity : Activity() {
    runOnUiThread {
     chat.append("\n" + answer)
     findViewById<ScrollView>(R.id.scroll).post { findViewById<ScrollView>(R.id.scroll).fullScroll(ScrollView.FOCUS_DOWN) }
-    if(speakNext) speak(answer)
+    speak(answer)
    }
   }
  }
@@ -141,7 +141,7 @@ class MainActivity : Activity() {
     conn.setRequestProperty("Content-Type","application/json"); conn.setRequestProperty("x-goog-api-key",key); conn.doOutput=true
     val body=org.json.JSONObject().put("contents", org.json.JSONArray().put(
      org.json.JSONObject().put("parts", org.json.JSONArray().put(org.json.JSONObject().put("text",
-      "You are My PC AI Agent. Answer clearly in Bengali or English matching the user. Never claim you performed a phone or PC action unless the app has confirmed it succeeded. If an action was not executed, explain that honestly. User request: " + prompt
+      "Your name is Siri. You are a friendly female-voiced personal assistant in a phone app. Answer naturally and clearly in Bengali or English matching the user. Keep spoken answers concise. Never claim you performed a phone or PC action unless the app has confirmed it succeeded. If an action was not executed, explain that honestly. User request: " + prompt
      )))
     )).toString()
     conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
