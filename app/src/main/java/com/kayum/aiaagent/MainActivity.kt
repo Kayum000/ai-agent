@@ -24,6 +24,8 @@ class MainActivity : Activity() {
 
  override fun onCreate(b: Bundle?) {
   super.onCreate(b); setContentView(R.layout.activity_main)
+  // Erase a legacy API key saved by older versions; no hosted AI key is used.
+  prefs.edit().remove("gemini_key").apply()
   chat=findViewById(R.id.chat); input=findViewById(R.id.input); status=findViewById(R.id.status)
   findViewById<Button>(R.id.send).setOnClickListener { send(false) }
   findViewById<Button>(R.id.voice).setOnClickListener { startVoiceInput() }
