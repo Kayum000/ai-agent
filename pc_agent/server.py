@@ -234,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt: str, *args) -> None:
         # Avoid logging command contents or authentication headers.
-        print(f"[PC Agent] {self.address[0]} - {fmt % args}")
+        print(f"[PC Agent] {self.client_address[0]} - {fmt % args}")
 
 
 def main() -> None:
