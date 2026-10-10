@@ -83,12 +83,20 @@ class MainActivity : Activity() {
     val body = result.removePrefix("HTTP 200: ")
     try {
      val json = org.json.JSONObject(body)
-     if (json.optBoolean("handled", false)) return json.optString("response").ifBlank { "PC task completed." }
-    } catch(_:Exception) { }
+     val message = json.optString("response").trim()
+     if (json.optBoolean("handled", false)) return message.ifBlank { "PC task completed." }
+     // Keep the PC agent's real explanation instead of hiding it behind a generic error.
+     if (message.isNotBlank()) return message
+     return "PC Agent command বুঝেছে, কিন্তু কোনো action সম্পন্ন করেনি।"
+    } catch(_:Exception) {
+     return "PC Agent থেকে ভুল response এসেছে। PC Agent আপডেট করে আবার চেষ্টা করুন।"
+    }
    } else if (result.startsWith("HTTP 401:")) {
     return "PC Agent token ভুল। Settings-এ PC token ঠিক করে আবার চেষ্টা করুন।"
    } else if (result.startsWith("HTTP 404:")) {
     return "PC Agent endpoint পাওয়া যায়নি। Settings-এ PC Agent URL পরীক্ষা করুন।"
+   } else if (result.startsWith("PC Agent error:")) {
+    return "PC Agent-এ সংযোগ হচ্ছে না। PC-তে server চালু আছে কি না, Wi-Fi একই network-এ কি না, এবং URL/token ঠিক আছে কি না পরীক্ষা করুন। বিস্তারিত: " + result.removePrefix("PC Agent error:").trim()
    }
   }
   val phone = PhoneAgent.handle(this, prompt)
