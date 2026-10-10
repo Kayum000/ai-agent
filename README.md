@@ -44,12 +44,13 @@ The PC companion exposes authenticated, signal-only endpoints:
 - `POST /api/collector/quotex` — accepts normalized candles/ticks from the local collector.
 - `POST /api/binary/signal` — returns `CALL`, `PUT`, or `NO TRADE`; expiry is selected automatically by the existing rule-based market-regime heuristic (60–300 seconds).
 - `POST /api/screenshot/analyze` — accepts JSON `{"image_base64":"..."}` (raw base64 or a data URL) and extracts visible text using optional OCR dependencies.
+- `POST /api/binary/analyze` — one-request pipeline: optionally OCRs a screenshot, then combines it with fresh cached collector candles/ticks to produce a signal and expiry. Send `{"asset":"EURUSD","image_base64":"..."}`; current collector data must already have been posted to `/api/collector/quotex`. You may also include `candles`/ `ticks` directly.
 
 ### Enable screenshot OCR
 
 Install Python packages `Pillow` and `pytesseract`, and install the Tesseract OCR executable for your operating system. OCR is intentionally conservative and does **not** interpret candle shapes or claim to be a vision AI. If the screenshot contains no single unambiguous visible direction label, the result has no direction and should not be used as a trade signal.
 
-Send the OCR response's object as `screenshot_analysis` to `POST /api/binary/signal`, alongside current closed candles. The signal engine checks screenshot age and asset mismatch. Use fresh live data; stale data produces `NO TRADE`. All endpoints require the existing `X-PC-Agent-Token` header. This remains signal-only and never places orders.
+For the combined workflow, first POST collector data to `/api/collector/quotex`, then send the screenshot and asset to `POST /api/binary/analyze`. The response includes both `screenshot_analysis` and the signal result. Alternatively, send the OCR response's object as `screenshot_analysis` to `POST /api/binary/signal`, alongside current closed candles. The signal engine checks screenshot age and asset mismatch. Use fresh live data; stale data produces `NO TRADE`. All endpoints require the existing `X-PC-Agent-Token` header. This remains signal-only and never places orders.
 
 Example screenshot request body:
 
