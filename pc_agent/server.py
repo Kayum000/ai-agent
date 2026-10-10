@@ -299,7 +299,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path.rstrip("/") == "/health":
-            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "open_allowlisted_app", "system_info", "quotex_collector_ingest", "binary_signal_analysis", "screenshot_ocr_analysis", "combined_live_screenshot_analysis"]})
+            self._send(200, {"ok": True, "name": APP_NAME, "capabilities": ["open_url", "web_search", "open_allowlisted_app", "open_downloads", "open_task_manager", "system_info", "quotex_collector_ingest", "binary_signal_analysis", "screenshot_ocr_analysis", "combined_live_screenshot_analysis"]})
         else:
             self._send(404, {"ok": False, "error": "not_found"})
 
