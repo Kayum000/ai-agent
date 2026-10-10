@@ -311,7 +311,7 @@ def handle_command(command: str) -> dict:
         folder_match = re.search(r"(?:ফোল্ডার\s+বানাও|ফোল্ডার\s+তৈরি\s+করো)\s+(.+)$", raw, flags=re.IGNORECASE)
     if folder_match:
         name = folder_match.group(1).strip().strip("\"'")
-        if not name or name in {".", ".."} or "/" in name or "\\" in name or Path(name).name != name:
+        if not name or name in {".", ".."} or "/" in name or "\\" in name or any(ch in name for ch in '< >:"|?*'.replace(" ", "")) or name.endswith((".", " ")) or Path(name).name != name:
             return {"ok": False, "handled": True, "action": "make_folder", "response": "নিরাপত্তার জন্য শুধু একটি সাধারণ folder name ব্যবহার করুন।"}
         try:
             desktop = Path.home() / "Desktop"
@@ -328,7 +328,7 @@ def handle_command(command: str) -> dict:
     if file_match:
         name = file_match.group(1).strip().strip("\"'")
         content = (file_match.group(2) or "")[:20000]
-        if not name or name in {".", ".."} or "/" in name or "\\" in name or Path(name).name != name:
+        if not name or name in {".", ".."} or "/" in name or "\\" in name or any(ch in name for ch in '< >:"|?*'.replace(" ", "")) or name.endswith((".", " ")) or Path(name).name != name:
             return {"ok": False, "handled": True, "action": "make_file", "response": "নিরাপত্তার জন্য শুধু একটি সাধারণ file name ব্যবহার করুন।"}
         try:
             desktop = Path.home() / "Desktop"
