@@ -215,7 +215,7 @@ def generate_binary_signal(payload):
             sd, sc = _direction(screenshot.get("direction") or screenshot.get("bias")), _num(screenshot.get("confidence")) or 0
             if sd and sc >= .65:
                 existing = {d: sum(w for a,w,_ in votes if a == d) for d in ("CALL","PUT")}
-                screenshot_note = "screenshot/live conflict" if votes and existing["CALL" if sd=="PUT" else "PUT"] > existing[sd] else "screenshot observation added"
+                screenshot_note = "screenshot/live conflict" if votes and existing["CALL" if sd=="PUT" else "PUT"] >= existing[sd] else "screenshot observation added"
                 votes.append((sd, min(1.0, max(0.0, sc)), "screenshot chart observation"))
     cw, pw = sum(w for a,w,_ in votes if a=="CALL"), sum(w for a,w,_ in votes if a=="PUT")
     total = cw + pw

@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   build:
@@ -12,7 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check PC agent Python syntax
-        run: python -m py_compile pc_agent/server.py
+        run: python -m py_compile pc_agent/server.py pc_agent/binary_signal_engine.py
+      - name: Test binary signal engine
+        run: python -m unittest discover -s tests
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
