@@ -24,8 +24,10 @@ import re
 
 try:
     from pc_agent.binary_signal_engine import ingest_collector_payload, generate_binary_signal
+    from pc_agent.screenshot_analyzer import analyze_screenshot
 except ModuleNotFoundError:  # Supports running `python pc_agent/server.py` directly.
     from binary_signal_engine import ingest_collector_payload, generate_binary_signal
+    from screenshot_analyzer import analyze_screenshot
 
 APP_NAME = "My PC AI Agent"
 HOST = os.environ.get("PC_AGENT_HOST", "0.0.0.0")
@@ -214,7 +216,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path.rstrip("/")
-        if path not in {"/api/mobile/command", "/api/collector/quotex", "/api/binary/signal"}:
+        if path not in {"/api/mobile/command", "/api/collector/quotex", "/api/binary/signal", "/api/screenshot/analyze"}:
             self._send(404, {"ok": False, "error": "not_found"})
             return
         supplied = self.headers.get("X-PC-Agent-Token", "")
@@ -225,7 +227,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = 0
-        max_body = 512 * 1024 if path != "/api/mobile/command" else MAX_BODY
+        max_body = 8 * 1024 * 1024 if path == "/api/screenshot/analyze" else (512 * 1024 if path != "/api/mobile/command" else MAX_BODY)
         if length < 1 or length > max_body:
             self._send(413, {"ok": False, "error": "invalid_body_size"})
             return
