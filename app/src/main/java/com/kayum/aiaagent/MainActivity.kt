@@ -94,7 +94,7 @@ class MainActivity : Activity() {
   }
   // Keep phone-only app actions working even when a PC URL is configured.
   val low = prompt.lowercase()
-  val phoneOnlyIntent = listOf("whatsapp", "telegram", "facebook", "play store", "সেটিংস", "ফোনে").any { low.contains(it) }
+  val phoneOnlyIntent = listOf("whatsapp", "telegram", "facebook", "play store", "settings", "সেটিং", "সেটিংস", "ফোনে").any { low.contains(it) }
   if (!forcePc && phoneOnlyIntent) {
    val phone = PhoneAgent.handle(this, prompt)
    if (phone != null) return phone
