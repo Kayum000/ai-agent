@@ -32,7 +32,7 @@ except ModuleNotFoundError:  # Supports running `python pc_agent/server.py` dire
     from screenshot_analyzer import analyze_screenshot
     from combined_analysis import analyze_live_with_screenshot
 
-APP_NAME = "My PC AI Agent"
+APP_NAME = "Siri Agent"
 HOST = os.environ.get("PC_AGENT_HOST", "0.0.0.0")
 PORT = int(os.environ.get("PC_AGENT_PORT", "8765"))
 MAX_BODY = 8192
